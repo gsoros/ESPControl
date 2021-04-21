@@ -24,10 +24,6 @@ bool stepper_enable = false;
 int stepper_direction = 0;
 int stepper_speed = 0;
 
-WiFiEventHandler stationConnectedHandler;
-WiFiEventHandler stationDisconnectedHandler;
-WiFiEventHandler probeRequestPrintHandler;
-
 ESP8266WebServer server(80);
 
 void handleRoot() {
@@ -54,9 +50,9 @@ class ServerTask : public Task {
         Serial.print("IP Address: ");    
         Serial.println(WiFi.softAPIP());
         
-        stationConnectedHandler = WiFi.onSoftAPModeStationConnected(&onConnected);
-        stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(&onDisconnected);
-        probeRequestPrintHandler = WiFi.onSoftAPModeProbeRequestReceived(&onProbe);
+        WiFi.onSoftAPModeStationConnected(&onConnected);
+        WiFi.onSoftAPModeStationDisconnected(&onDisconnected);
+        WiFi.onSoftAPModeProbeRequestReceived(&onProbe);
         
         server.on("/", handleRoot);
         server.on("/command", handleCommand);
