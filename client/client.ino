@@ -6,8 +6,7 @@
 
 const char *AP_SSID = "StepperControl";
 const char *AP_PASSWORD = NULL;
-IPAddress host(192, 168, 4, 1);
-const uint16_t PORT = 80;
+const IPAddress DEFAULT_GATEWAY(192, 168, 4, 1);
 
 const int POT_PIN = A0;
 const int POT_MIN = 0;
@@ -39,6 +38,7 @@ int last_command = (COMMAND_MIN + COMMAND_MAX) / 2;
 int command = last_command;
 int command_diff = 0;
 bool monitor = false;
+IPAddress host = DEFAULT_GATEWAY;
 
 void waitForWifi(int pause = 100) {
     while (WiFi.status() != WL_CONNECTED) {
@@ -82,6 +82,7 @@ class CommandTask : public Task {
     protected:
     void setup() {
         Serial.printf("Connecting to %s\n", AP_SSID);
+        Serial.flush();
         WiFi.mode(WIFI_STA);
         WiFi.setAutoConnect(true);
         WiFi.setAutoReconnect(true);
@@ -114,7 +115,7 @@ class CommandTask : public Task {
                 } else {
                     Serial.printf("[HTTP] GET... code: %d\n", httpCode);
                     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-                        Serial.println(http.getString());
+                        Serial.printf("[HTTP] Response: %s\n", http.getString().c_str());
                     }      
                 }         
                 http.end();
