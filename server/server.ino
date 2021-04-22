@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
-#include <Scheduler.h>            // https://github.com/nrwiersma/ESP8266Scheduler
+#include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
 #include "html.h"
 
 const char *AP_SSID = "StepperControl";
@@ -13,12 +13,12 @@ const int AP_MAX_CONNECTIONS = 1;
 const int STEPPER_PIN_ENABLE = D1;
 const int STEPPER_PIN_DIRECTION = D2;
 const int STEPPER_PIN_STEP = D3;
-const int STEPPER_MIN = 10;    // minimum delay between pulses: fastest speed
-const int STEPPER_MAX = 1000;  // maximum delay between pulses: slowest speed
-const int STEPPER_PULSE = 10;  // pulse width
+const int STEPPER_MIN = 10;             // minimum delay between pulses: fastest speed
+const int STEPPER_MAX = 1000;           // maximum delay between pulses: slowest speed
+const int STEPPER_PULSE = 10;           // pulse width
 
-const int SLIDER_MIN = -1000;
-const int SLIDER_MAX = 1000;
+const int COMMAND_MIN = -511;
+const int COMMAND_MAX = 512;
 
 bool stepper_enable = false;
 int stepper_direction = 0;
@@ -33,6 +33,12 @@ void handleRoot() {
 
 void handleCommand() {
     int vector = server.arg("vector").toInt();
+    if (vector < COMMAND_MIN) {
+        vector = COMMAND_MIN;
+    }
+    else if (vector > COMMAND_MAX) {
+        vector = COMMAND_MAX;
+    }
     stepper_direction = vector < 0 ? -1 : 1;
     stepper_speed = abs(vector);
     stepper_enable = stepper_speed > 0;
@@ -81,7 +87,7 @@ class ControlTask : public Task {
             digitalWrite(STEPPER_PIN_STEP, HIGH);
             delay(STEPPER_PULSE);
             digitalWrite(STEPPER_PIN_STEP, LOW);
-            int pause = map(stepper_speed, SLIDER_MIN, SLIDER_MAX, STEPPER_MAX*2, STEPPER_MIN);
+            int pause = map(stepper_speed, COMMAND_MIN, COMMAND_MAX, STEPPER_MAX*2, STEPPER_MIN);
             delay(pause);
         }
         digitalWrite(STEPPER_PIN_ENABLE, LOW);
