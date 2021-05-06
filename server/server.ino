@@ -19,6 +19,7 @@ const int STEPPER_PULSE = 10;           // pulse width
 
 const int COMMAND_MIN = -511;
 const int COMMAND_MAX = 512;
+const int COMMAND_RATE = 100;           // minimum number of milliseconds between commands sent by the client
 
 bool stepper_enable = false;
 int stepper_direction = 0;
@@ -43,9 +44,18 @@ void handleCommand() {
     stepper_speed = abs(vector);
     stepper_enable = stepper_speed > 0;
     char message[100];
-    sprintf(message, "command enable: %d  direction: %d  speed: %d", stepper_enable, stepper_direction, stepper_speed);
+    sprintf(message, "command enable: %d  direction: %d  speed: %d", 
+        stepper_enable, stepper_direction, stepper_speed);
     server.send(200, "text/plain", message);
     Serial.println(message);
+}
+
+void handleConfig() {
+    char json[100];
+    snprintf(json, 100, "{\"name\": \"%s\", \"min\": %i, \"max\": %i, \"rate\": %i}", 
+        AP_SSID, COMMAND_MIN, COMMAND_MAX, COMMAND_RATE);
+    server.send(200, "application/json", json);
+    Serial.println("config");
 }
 
 class ServerTask : public Task {
@@ -62,6 +72,7 @@ class ServerTask : public Task {
         
         server.on("/", handleRoot);
         server.on("/command", handleCommand);
+        server.on("/config", handleConfig);
         server.begin();
     }
     void loop()  {
