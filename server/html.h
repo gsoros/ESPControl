@@ -28,14 +28,6 @@ var nextCommand = 0;
 output.innerHTML = slider.value;
 
 var req = new XMLHttpRequest();
-req.addEventListener("load", function() {
-    console.log(this.responseText);
-    var myObj = JSON.parse(this.responseText);
-});
-req.open("GET", "/config");
-req.send();
-
-var req = new XMLHttpRequest();
 req.onreadystatechange = function() {
     if (this.readyState == 4) {
         if (this.status == 200) {
@@ -63,10 +55,6 @@ req.onreadystatechange = function() {
 };
 req.open("GET", "/config");
 req.send();
-
-function now() {
-    
-}
 
 function sendCommand() {
     var d = new Date();
