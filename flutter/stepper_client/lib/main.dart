@@ -76,12 +76,8 @@ class _StepperHomeState extends State<StepperHome> {
     super.dispose();
   }
 
-  int _now() {
-    return DateTime.now().millisecondsSinceEpoch;
-  }
-
   void _sendCommand() {
-    int now = _now();
+    int now = DateTime.now().millisecondsSinceEpoch;
     if ((now - _lastCommandTime) >= _commandRate) {
       _log("Sending  command: $_vector");
       _request('command', params: {'vector': _run ? _vector.toString() : '0'});
