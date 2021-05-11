@@ -2,6 +2,7 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
+#include <DNSServer.h>
 #include "html.h"
 
 const char *AP_SSID = "StepperControl";
@@ -9,6 +10,12 @@ const char *AP_PASSWORD = NULL;
 const int AP_CHANNEL = 1;
 const bool AP_HIDDEN = false;
 const int AP_MAX_CONNECTIONS = 1;
+const IPAddress AP_IP(192, 168, 1, 1);
+//const IPAddress AP_IP(10, 0, 0, 1);
+//const IPAddress AP_IP(172, 217, 28, 1);
+const IPAddress NET_MASK(255, 255, 255, 0);
+const byte DNS_PORT = 53;
+const int DNS_TTL = 10;
 
 const int STEPPER_PIN_ENABLE = D1;
 const int STEPPER_PIN_DIRECTION = D2;
@@ -25,6 +32,7 @@ bool stepper_enable = false;
 int stepper_direction = 0;
 int stepper_speed = 0;
 
+DNSServer dnsServer;
 ESP8266WebServer server(80);
 
 void handleRoot() {
@@ -62,13 +70,16 @@ class ServerTask : public Task {
     protected:
     void setup() {
         WiFi.mode(WIFI_AP);
+        WiFi.softAPConfig(AP_IP, AP_IP, NET_MASK);
         WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, AP_HIDDEN, AP_MAX_CONNECTIONS);
-        Serial.print("IP Address: ");    
-        Serial.println(WiFi.softAPIP());
         
         WiFi.onSoftAPModeStationConnected(&onConnected);
         WiFi.onSoftAPModeStationDisconnected(&onDisconnected);
         WiFi.onSoftAPModeProbeRequestReceived(&onProbe);
+
+        dnsServer.setTTL(DNS_TTL);
+        dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
+        dnsServer.start(DNS_PORT, "*", AP_IP);
         
         server.on("/", handleRoot);
         server.on("/command", handleCommand);
@@ -76,6 +87,7 @@ class ServerTask : public Task {
         server.begin();
     }
     void loop()  {
+        dnsServer.processNextRequest();
         server.handleClient();
     }
 } server_task;

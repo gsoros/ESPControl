@@ -6,7 +6,7 @@
 
 const char *AP_SSID = "StepperControl";
 const char *AP_PASSWORD = NULL;
-const IPAddress DEFAULT_GATEWAY(192, 168, 4, 1);
+const char *HOSTNAME = "steppercontrol.local"; 
 
 const int POT_PIN = A0;
 const int POT_MIN = 0;
@@ -37,8 +37,8 @@ int last_command = (command_min + command_max) / 2;
 int command = last_command;
 int command_diff = 0;
 bool monitor_enable = false;
-IPAddress host = DEFAULT_GATEWAY;
 int responseBufferLength = 255;
+IPAddress host_ip;
 
 void waitForWifi(int pause = 100) {
     while (WiFi.status() != WL_CONNECTED) {
@@ -64,7 +64,7 @@ int httpRequest(char *url, char *response) {
         }         
         http.end();
     } else {
-        Serial.print("[HTTP] Unable to connect\n");
+        Serial.println("[HTTP] Unable to connect");
     }
     return http_code;    
 }
@@ -112,14 +112,21 @@ class CommandTask : public Task {
         WiFi.setAutoReconnect(true);
         WiFi.begin(AP_SSID, AP_PASSWORD);
         waitForWifi();
-        host = WiFi.gatewayIP();
+        int err;
+        while (err != 1) {
+            err = WiFi.hostByName(HOSTNAME, host_ip);
+            if(err != 1) {
+                Serial.printf("Error getting server IP address, code: %i\n", err);
+                delay(500);
+            }
+        }
         Serial.printf(
-            "WiFi connected, IP: %s  Gateway: %s\n", 
+            "WiFi connected, our IP: %s, server IP: %s\n", 
             WiFi.localIP().toString().c_str(), 
-            host.toString().c_str()
+            host_ip.toString().c_str()
         );
         char url[100];
-        sprintf(url, "http://%s/config", host.toString().c_str());
+        sprintf(url, "http://%s/config", HOSTNAME);
         char response[responseBufferLength];
         int http_code = httpRequest(url, response);
         if (http_code == HTTP_CODE_OK) {
@@ -144,7 +151,7 @@ class CommandTask : public Task {
             last_command = command;
             Serial.printf("Sending command: %d\n", command);
             char url[100];
-            sprintf(url, "http://%s/command?vector=%d", host.toString().c_str(), command);
+            sprintf(url, "http://%s/command?vector=%d", HOSTNAME, command);
             char response[responseBufferLength];
             httpRequest(url, response);   
         } 
@@ -163,9 +170,9 @@ class MonitorTask : public Task {
             delay(100); 
         }
         Serial.printf(
-            "WiFi: %s  Host: %s  measurement: %d  command: %d\n", 
+            "WiFi: %s  Server: %s, measurement: %d, command: %d\n", 
             wl_status[WiFi.status()], 
-            host.toString().c_str(), 
+            host_ip.toString().c_str(), 
             measurement, 
             command
         );
