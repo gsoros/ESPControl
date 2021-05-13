@@ -2,20 +2,11 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
-#include <DNSServer.h>
+#include <WiFiManager.h>                // https://github.com/tzapu/WiFiManager
+#include <ESP8266mDNS.h> 
 #include "html.h"
 
-const char *AP_SSID = "StepperControl";
-const char *AP_PASSWORD = NULL;
-const int AP_CHANNEL = 1;
-const bool AP_HIDDEN = false;
-const int AP_MAX_CONNECTIONS = 1;
-const IPAddress AP_IP(192, 168, 1, 1);
-//const IPAddress AP_IP(10, 0, 0, 1);
-//const IPAddress AP_IP(172, 217, 28, 1);
-const IPAddress NET_MASK(255, 255, 255, 0);
-const byte DNS_PORT = 53;
-const int DNS_TTL = 10;
+const char *NODE_NAME = "StepperControl";
 
 const int STEPPER_PIN_ENABLE = D1;
 const int STEPPER_PIN_DIRECTION = D2;
@@ -32,7 +23,7 @@ bool stepper_enable = false;
 int stepper_direction = 0;
 int stepper_speed = 0;
 
-DNSServer dnsServer;
+WiFiManager wifiManager;
 ESP8266WebServer server(80);
 
 void handleRoot() {
@@ -61,34 +52,29 @@ void handleCommand() {
 void handleConfig() {
     char json[100];
     snprintf(json, 100, "{\"name\": \"%s\", \"min\": %i, \"max\": %i, \"rate\": %i}", 
-        AP_SSID, COMMAND_MIN, COMMAND_MAX, COMMAND_RATE);
+        NODE_NAME, COMMAND_MIN, COMMAND_MAX, COMMAND_RATE);
     server.send(200, "application/json", json);
     Serial.println("config");
 }
 
 class ServerTask : public Task {
     protected:
-    void setup() {
-        WiFi.mode(WIFI_AP);
-        WiFi.softAPConfig(AP_IP, AP_IP, NET_MASK);
-        WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, AP_HIDDEN, AP_MAX_CONNECTIONS);
-        
-        WiFi.onSoftAPModeStationConnected(&onConnected);
-        WiFi.onSoftAPModeStationDisconnected(&onDisconnected);
-        WiFi.onSoftAPModeProbeRequestReceived(&onProbe);
-
-        dnsServer.setTTL(DNS_TTL);
-        dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
-        dnsServer.start(DNS_PORT, "*", AP_IP);
-        
+    void setup() {        
         server.on("/", handleRoot);
         server.on("/command", handleCommand);
         server.on("/config", handleConfig);
         server.begin();
+        //if (MDNS.begin(NODE_NAME)) {
+        if (MDNS.begin(NODE_NAME, WiFi.localIP(), 1)) { // TTL is ignored
+            Serial.println("mDNS responder started");
+        } else {
+            Serial.println("Error setting up MDNS responder");
+        }
+        MDNS.addService("http", "tcp", 80);
     }
     void loop()  {
-        dnsServer.processNextRequest();
         server.handleClient();
+        MDNS.update();
     }
 } server_task;
 
@@ -121,44 +107,20 @@ class ControlTask : public Task {
 class MonitorTask : public Task {
     protected:
     void loop() {
-        Serial.printf("connected: %d  enable: %d  direction: %d  speed: %d\n", 
-            WiFi.softAPgetStationNum(), stepper_enable, stepper_direction, stepper_speed);
-        delay(1000);
+        Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n", 
+            WiFi.localIP().toString().c_str(), stepper_enable, stepper_direction, stepper_speed);
+        delay(5000);
     }
 } monitor_task;
 
-
-void onConnected(const WiFiEventSoftAPModeStationConnected& evt) {
-    Serial.print("connected: ");
-    Serial.println(macToString(evt.mac));
-}
-
-void onDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt) {
-    stepper_enable = false;
-    Serial.print("disconnected: ");
-    Serial.println(macToString(evt.mac));
-}
-
-void onProbe(const WiFiEventSoftAPModeProbeRequestReceived& evt) {
-    Serial.print("probe from: ");
-    Serial.print(macToString(evt.mac));
-    Serial.print(" RSSI: ");
-    Serial.println(evt.rssi);
-}
-
-String macToString(const unsigned char* mac) {
-    char buf[20];
-    snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    return String(buf);
-}
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
-    Serial.println("");
+    Serial.println("-------------------------------------------------");
     delay(1000);
+    wifiManager.autoConnect(NODE_NAME);
     Scheduler.start(&server_task);
     Scheduler.start(&control_task);
     Scheduler.start(&monitor_task);

@@ -5,10 +5,160 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_switch/flutter_switch.dart';
+import 'package:multicast_dns/multicast_dns.dart';
 //import 'random.dart' as random;
 
 void main() {
   runApp(StepperApp());
+}
+
+class Host {
+  String name;
+  String ip;
+  Map<String, int> services;
+  String _currentService = '';
+
+  Host(this.name, this.ip, this.services);
+
+  replace(Host host) {
+    name = host.name;
+    ip = host.ip;
+    services = host.services;
+  }
+
+  update(Host host) {
+    name = host.name;
+    ip = host.ip;
+    host.services.forEach((service, port) {
+      services[service] = port;
+    });
+  }
+
+  String currentService() {
+    if (hasService(_currentService)) {
+      return _currentService;
+    }
+    return services.isEmpty ? '' : services.keys.first;
+  }
+
+  setCurrentService(String service) {
+    if (hasService(service)) {
+      _currentService = service;
+    }
+  }
+
+  bool hasService(String service) {
+    return services.containsKey(service);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'ip': ip,
+        'services': services,
+      };
+
+  String formatted(String service) => '$name:$service';
+
+  DropdownMenuItem<String> toDropdownMenuItem(String service) {
+    String formatted = this.formatted(service);
+    return DropdownMenuItem(
+      child: Text(formatted),
+      value: formatted,
+    );
+  }
+
+  List<DropdownMenuItem<String>> toDropdownMenuItems() {
+    List<DropdownMenuItem<String>> items = [];
+    services.forEach((service, port) {
+      items.add(this.toDropdownMenuItem(service));
+    });
+    return items;
+  }
+}
+
+class Hosts {
+  Map<String, Host> hosts = {};
+  String _current = '';
+
+  init() {
+    Host host = defualt();
+    hosts = <String, Host>{host.name: host};
+    _current = host.name;
+  }
+
+  Host defualt() {
+    return Host(
+      'discovering',
+      '192.168.1.1',
+      <String, int>{' services...': 80},
+    );
+  }
+
+  updateHost(Host host) {
+    if (has(host.name)) {
+      hosts[host.name]!.update(host);
+    } else {
+      hosts[host.name] = host;
+    }
+  }
+
+  update(Hosts newHosts) {
+    String service = currentService();
+    hosts = newHosts.hosts;
+    setCurrentService(service);
+  }
+
+  Host current() {
+    if (has(_current)) {
+      return get(_current)!;
+    }
+    if (hosts.isEmpty) {
+      return defualt();
+    }
+    return hosts[hosts.keys.first]!;
+  }
+
+  setCurrent(String? formatted) {
+    if (formatted == null) return;
+    String hostName = formatted.substring(0, formatted.indexOf(':'));
+    String service = formatted.substring(formatted.indexOf(':') + 1);
+    if (has(hostName)) {
+      _current = hostName;
+    }
+    setCurrentService(service);
+  }
+
+  String currentService() {
+    return current().currentService();
+  }
+
+  setCurrentService(String service) {
+    current().setCurrentService(service);
+  }
+
+  bool has(String hostName) {
+    return hosts.containsKey(hostName);
+  }
+
+  Host? get(String hostName) {
+    return has(hostName) ? hosts[hostName] : null;
+  }
+
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> json = {};
+    hosts.forEach((name, host) {
+      json[name] = host.toJson();
+    });
+    return json;
+  }
+
+  List<DropdownMenuItem<String>> toDropdownMenuItems() {
+    List<DropdownMenuItem<String>> items = [];
+    hosts.forEach((name, host) {
+      items.addAll(host.toDropdownMenuItems());
+    });
+    return items;
+  }
 }
 
 class StepperApp extends StatelessWidget {
@@ -39,8 +189,7 @@ class StepperHome extends StatefulWidget {
 
 class _StepperHomeState extends State<StepperHome> {
   //String _host = "steppercontrol.local";
-  String _host = '192.168.1.1';
-  String _hostName = '';
+  Hosts _hosts = Hosts();
   int _commandMin = -100;
   int _commandMax = 100;
   int _commandRate = 1000;
@@ -48,30 +197,29 @@ class _StepperHomeState extends State<StepperHome> {
   bool _run = false;
   List<String> _logList = <String>['Welcome.'];
   final int _logLimit = 100;
-  String _lastConfigFrom = '';
   int _lastCommandTime = 0;
   int _nextCommandTime = 0;
-  late TextEditingController _hostController;
   late http.Client _client;
+  String _mDNSServiceType = '_http._tcp';
+  //String _mDNSServiceType = '_steppercontrol._tcp';
 
   @override
   void initState() {
     super.initState();
+    _hosts.init();
     new Timer.periodic(
-      const Duration(milliseconds: 5000),
+      const Duration(seconds: 5),
       (Timer t) {
         //_log(random.sentence(maxWords: 20));
+        //_log('Starting mDNS discovery');
+        _discoverHosts();
       },
     );
-    _hostController = TextEditingController(text: _host);
     _client = http.Client();
-    //_client.connectionTimeout = const Duration(seconds: 10);
-    _updateConfig();
   }
 
   @override
   void dispose() {
-    _hostController.dispose();
     _client.close();
     super.dispose();
   }
@@ -93,18 +241,15 @@ class _StepperHomeState extends State<StepperHome> {
     _request('config').then(
       (json) {
         if (0 < json.length) {
-          _lastConfigFrom = _host;
           _log("Config reply: $json");
           Map<String, dynamic> config = jsonDecode(json);
-          _log(
-              "Old config: $_hostName $_commandMin $_commandMax $_commandRate");
-          _hostName = config['name'];
-          _commandMin = config['min'];
-          _commandMax = config['max'];
-          _commandRate = config['rate'];
-          _log(
-              "New config: $_hostName $_commandMin $_commandMax $_commandRate");
-          _log("Last config from: $_lastConfigFrom");
+          _log("Old config: $_commandMin $_commandMax $_commandRate");
+          setState(() {
+            _commandMin = config['min'];
+            _commandMax = config['max'];
+            _commandRate = config['rate'];
+          });
+          _log("New config: $_commandMin $_commandMax $_commandRate");
           _sendCommand();
         }
       },
@@ -116,14 +261,6 @@ class _StepperHomeState extends State<StepperHome> {
         _log("Update config error: ${e.toString()}");
       },
     );
-  }
-
-  void _setHost(String value) {
-    _log("Setting host to $value");
-    setState(() {
-      _host = value;
-      _updateConfig();
-    });
   }
 
   void _setVector(double value) {
@@ -156,10 +293,15 @@ class _StepperHomeState extends State<StepperHome> {
     int statusCode = 0;
 
     try {
-      var url = Uri.http(_host, path, params);
-      //if (url.port == 0) {
-      //url = url.replace(port: 80);
-      //}
+      var host = _hosts.current();
+      var name = host.name;
+      var ip = host.ip;
+      var service = _hosts.currentService();
+      var url = Uri.http(ip, path, params);
+      if (!host.services.containsKey(service)) {
+        throw Exception('Port not found for $name:$service');
+      }
+      url = url.replace(port: host.services[service]);
       _log("[HTTP] Url: ${url.toString()} Port: ${url.port.toString()}");
       var response = await _client.get(url).catchError((e) {
         _log("[HTTP AsyncAPI]: ${e.toString()}");
@@ -177,6 +319,50 @@ class _StepperHomeState extends State<StepperHome> {
           "[HTTP] Request to $path failed: ${statusCode.toString()}: $responseBody");
     }
     return "";
+  }
+
+  void _discoverHosts() async {
+    Hosts discovered = Hosts();
+
+    final MDnsClient client = MDnsClient();
+    await client.start();
+
+    await for (final PtrResourceRecord ptr in client.lookup<PtrResourceRecord>(
+        ResourceRecordQuery.serverPointer(_mDNSServiceType))) {
+      //_log('[mDNS] PTR: ${ptr.toString()}');
+
+      await for (final SrvResourceRecord srv
+          in client.lookup<SrvResourceRecord>(
+              ResourceRecordQuery.service(ptr.domainName))) {
+        //_log('[mDNS] SRV target: ${srv.target} port: ${srv.port}');
+
+        await for (final IPAddressResourceRecord ip
+            in client.lookup<IPAddressResourceRecord>(
+                ResourceRecordQuery.addressIPv4(srv.target))) {
+          //_log('[mDNS] IP: ${ip.address.toString()}');
+          String serviceName =
+              ptr.domainName.substring(0, ptr.domainName.indexOf('.'));
+          discovered.updateHost(Host(srv.target, ip.address.address.toString(),
+              <String, int>{serviceName: srv.port}));
+        }
+      }
+    }
+
+    client.stop();
+    _log('[mDNS] Discovered: ${discovered.toJson()}');
+    // if (current host is gone or (current host available but does not have current service))
+    var current = _hosts.current().name;
+    bool gone = !discovered.has(current);
+    bool serviceGone = !gone &&
+        !discovered.hosts[current]!.hasService(_hosts.currentService());
+    _log('gone? $gone, serviceGone? $serviceGone');
+    setState(() {
+      _hosts.update(discovered);
+    });
+    if (gone || serviceGone) {
+      _log('triggering updateConfig()');
+      _updateConfig();
+    }
   }
 
   @override
@@ -197,22 +383,16 @@ class _StepperHomeState extends State<StepperHome> {
             transform: Matrix4.rotationZ(-0.02),
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _hostController,
-                    onSubmitted: _setHost,
-                    decoration: InputDecoration(
-                      filled: true,
-                      labelText: "Stepper Host:",
-                    ),
-                  ),
+                DropdownButton<String>(
+                  value: _hosts.current().formatted(_hosts.currentService()),
+                  items: _hosts.toDropdownMenuItems(),
+                  onChanged: (val) {
+                    setState(() {
+                      _hosts.setCurrent(val);
+                      _updateConfig();
+                    });
+                  },
                 ),
-                /*
-              ElevatedButton(
-                onPressed: _toggleConnection,
-                child: Text("Connect"),
-              ),
-              */
               ],
             ),
           ),
