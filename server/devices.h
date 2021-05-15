@@ -22,9 +22,9 @@ class Device : public Task {
         this->server = null;
     }
 
-    void handleApiControl(){};
+    virtual void handleApiControl(){};
         
-    JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
+    virtual JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
         JSONVar j;
         j["name"] = this->name;
         j["type"] = this->type;

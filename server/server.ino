@@ -37,7 +37,7 @@ class ServerTask : public Task {
     protected:
     void setup() {
         config.setServer(&server);
-        if (strlcpy(configJson, config.toJsonString().c_str(), JSON_LENGTH) > JSON_LENGTH)
+        if (strlcpy(configJson, config.toJsonString(CONFIG_MODE_PUBLIC).c_str(), JSON_LENGTH) > JSON_LENGTH)
             Serial.println("[ERROR] Json buffer too small");
         server.on("/", handleRoot);
         server.on("/api/control", handleApiControl);

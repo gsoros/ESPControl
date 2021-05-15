@@ -63,7 +63,7 @@ class Config {
 
     Device *device(int i) {
         if (i > this->deviceCount) {
-            Serial.printf("[Error] Device %i not found.", i);
+            Serial.printf("[Error] Device %i not found.\n", i);
             return null;
         }
         return this->devices[i];
@@ -75,7 +75,7 @@ class Config {
                 return this->devices[i];
             }
         }
-        Serial.printf("[Error] Device \"%s\" not found.", name);
+        Serial.printf("[Error] Device \"%s\" not found.\n", name);
         return null;
     }
 
@@ -85,7 +85,7 @@ class Config {
         //char *deviceName = "Stepper1";
         Device *device = this->device(deviceName);
         if (null == device) {
-            Serial.printf("[Error] control request received for non-existent device \"%s\"", deviceName);
+            Serial.printf("[Error] control request received for non-existent device \"%s\"\n", deviceName);
             return;
         }
         device->handleApiControl();
