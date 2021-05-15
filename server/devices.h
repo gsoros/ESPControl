@@ -116,7 +116,7 @@ class Stepper : public Device {
     }
 
     void loop() {
-       Serial.print("--StLoo--");
+       //Serial.print("--StLoo--");
        while (this->enabled && (0 < this->speed)) {
             digitalWrite(this->pin_direction, (0 < this->direction) ? HIGH : LOW);
             digitalWrite(this->pin_enable, HIGH);
@@ -170,7 +170,7 @@ class Led : public Device {
     }
 
     void loop() {
-        Serial.print(ESP.getFreeHeap());
+        //Serial.print(ESP.getFreeHeap());
         digitalWrite(this->pin_enable, this->enabled ? HIGH : LOW);
     }
 };

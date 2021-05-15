@@ -8,15 +8,19 @@
 #include "html.h"
 #include "config.h"
 
-WiFiManager wifiManager;
-ESP8266WebServer *server;
+#define API_PORT 50123                  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
+#define JSON_LENGTH 1024
+
+Config config;
 Stepper stepper1;
 Led led1;
-Config config;
-char *configJson;
+
+WiFiManager wifiManager;
+ESP8266WebServer server(API_PORT);
+char configJson[JSON_LENGTH];
 
 void handleRoot() {
-    server->send(200, "text/html", html);
+    server.send(200, "text/html", html);
     Serial.println("root");
 }
 
@@ -25,21 +29,20 @@ void handleApiControl() {
 }
 
 void handleApiConfig() {
-    server->send(200, "application/json", configJson);
+    server.send(200, "application/json", configJson);
     Serial.println("config");
 }
 
 class ServerTask : public Task {
     protected:
     void setup() {
-        configJson = const_cast<char*>(config.toJsonString().c_str());
-        ESP8266WebServer webServer(config.apiPort);
-        server = &webServer;
-        config.setServer(server);
-        server->on("/", handleRoot);
-        server->on("/api/control", handleApiControl);
-        server->on("/api/config", handleApiConfig);
-        //server->begin();
+        config.setServer(&server);
+        if (strlcpy(configJson, config.toJsonString().c_str(), JSON_LENGTH) > JSON_LENGTH)
+            Serial.println("[ERROR] Json buffer too small");
+        server.on("/", handleRoot);
+        server.on("/api/control", handleApiControl);
+        server.on("/api/config", handleApiConfig);
+        server.begin();
         if (MDNS.begin(config.name, WiFi.localIP(), 1)) { // TTL is ignored
             Serial.println("mDNS responder started");
         } else {
@@ -48,7 +51,7 @@ class ServerTask : public Task {
         MDNS.addService(config.mdnsService, "tcp", config.apiPort);
     }
     void loop()  {
-        server->handleClient();
+        server.handleClient();
         MDNS.update();
     }
 } server_task;
@@ -65,12 +68,11 @@ class MonitorTask : public Task {
 
 
 void setup() {
-    
     config.name = "Controller1";
     config.rate = 100;                      // minimum number of milliseconds between commands sent by the client
     config.mdnsService = "steppercontrol";  // clients look for this service when discovering
-    config.apiPort = 50123;                 // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
-
+    config.apiPort = API_PORT;   
+    
     stepper1.name = "Stepper1";
     stepper1.pin_enable = D1;
     stepper1.pin_direction = D2;
@@ -80,21 +82,20 @@ void setup() {
     stepper1.pulse = 10;            // pulse width
     stepper1.command_min = -511;
     stepper1.command_max = 512;
-    
+
     led1.name = "Led1";
     led1.pin_enable = D4;
 
-    
     config.addDevice(&stepper1);
     config.addDevice(&led1);
-
+    
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
     Serial.println("-------------------------------------------------");
     delay(1000);
     
-    //wifiManager.autoConnect(config.name);
+    wifiManager.autoConnect(config.name);
     
     Scheduler.start(&server_task);
     config.startControlTasks();

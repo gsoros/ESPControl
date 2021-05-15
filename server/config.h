@@ -99,7 +99,7 @@ class Config {
 
     void startControlTasks() {
         for (int i = 0; i < this->deviceCount; i++) {
-            Serial.printf("Starting control task for device %i", i);
+            Serial.printf("Starting control task for device %i\n", i);
             Scheduler.start(this->devices[i]);
         }
     }
