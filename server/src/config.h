@@ -12,20 +12,20 @@
 
 class Config {
     public:
-    char *name;
+    const char *name;
     int rate;
-    char *mdnsService;
+    const char *mdnsService;
     int apiPort;
     Device *devices[MAX_DEVICES];
     int deviceCount;
     ESP8266WebServer *server;
 
     Config(
-        char *name = "Controller",
+        const char *name = "Controller",
         int rate = 10,
-        char *mdnsService = "http",
+        const char *mdnsService = "http",
         int apiPort = 50123
-    ) {
+        ) {
         this->deviceCount = 0;
         this->name = name;
         this->rate = rate;
@@ -37,10 +37,10 @@ class Config {
     void setServer(ESP8266WebServer *server) {
         this->server = server;
         for (int i = 0; i < this->deviceCount; i++) {
-            this->devices[i]->server = server;
+                this->devices[i]->server = server;
         }
     }
-    
+
     bool addDevice(Device *device) {
         if (this->hasDevice(device->name)) {
             Serial.printf("[Error] Device name \"%s\" already exists.", device->name);
@@ -49,7 +49,7 @@ class Config {
         device->server = this->server;
         this->devices[this->deviceCount] = device;
         this->deviceCount++;
-        return true;               
+        return true;
     }
 
     bool hasDevice(const char *name) {
@@ -81,11 +81,12 @@ class Config {
 
     //void handleApiControl(ESP8266WebServer *server) {
     void handleApiControl() {
-        const char *deviceName = this->server->arg("device").c_str();
+        const char *deviceName = const_cast<char *>(this->server->arg("device").c_str());
         //char *deviceName = "Stepper1";
         Device *device = this->device(deviceName);
         if (null == device) {
             Serial.printf("[Error] control request received for non-existent device \"%s\"\n", deviceName);
+            this->server->send(500, "text/plain", "Device does not exist");
             return;
         }
         device->handleApiControl();

@@ -9,9 +9,9 @@
 #define DEVICES_MODE_PUBLIC 1
 
 class Device : public Task {
-    public: 
-    char *name;
-    char *type;
+    public:
+    const char *name;
+    const char *type;
     bool enabled;
     ESP8266WebServer *server;
 
@@ -23,7 +23,7 @@ class Device : public Task {
     }
 
     virtual void handleApiControl(){};
-        
+
     virtual JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
         JSONVar j;
         j["name"] = this->name;
@@ -48,7 +48,7 @@ class Stepper : public Device {
     int speed;
 
     Stepper(
-        char *name = "Stepper", 
+        const char *name = "Stepper",
         int pin_enable = 0,
         int pin_direction = 0,
         int pin_step = 0,
@@ -84,7 +84,7 @@ class Stepper : public Device {
         this->speed = abs(vector);
         this->enabled = this->speed > 0;
         char message[100];
-        sprintf(message, "command enable: %d  direction: %d  speed: %d", 
+        sprintf(message, "command enable: %d  direction: %d  speed: %d",
             this->enabled, this->direction, this->speed);
         this->server->send(200, "text/plain", message);
         Serial.println(message);
@@ -134,7 +134,7 @@ class Led : public Device {
     public:
     int pin_enable;
 
-    Led (char *name = "Led", int pin_enable = 0) {
+    Led (const char *name = "Led", int pin_enable = 0) {
         this->name = name;
         this->type = "led";
         this->pin_enable = pin_enable;
@@ -150,11 +150,11 @@ class Led : public Device {
         */
         this->enabled = enabled;
         char message[100];
-        sprintf(message, "command enable: %b", this->enabled);
+        sprintf(message, "command enable: %s", this->enabled ? "true" : "false");
         this->server->send(200, "text/plain", message);
         Serial.println(message);
     }
-    
+
     JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
         JSONVar j = Device::toJSONVar(mode);
         if (DEVICES_MODE_PRIVATE == mode) {

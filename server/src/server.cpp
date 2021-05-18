@@ -1,9 +1,10 @@
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
 #include <WiFiManager.h>                // https://github.com/tzapu/WiFiManager
-#include <ESP8266mDNS.h> 
+#include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
 #include "html.h"
 #include "config.h"
@@ -60,7 +61,7 @@ class ServerTask : public Task {
 class MonitorTask : public Task {
     protected:
     void loop() {
-        //Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n", 
+        //Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n",
         //    WiFi.localIP().toString().c_str(), stepper_enable, stepper_direction, stepper_speed);
         delay(5000);
     }
@@ -71,8 +72,8 @@ void setup() {
     config.name = "Controller1";
     config.rate = 100;                      // minimum number of milliseconds between commands sent by the client
     config.mdnsService = "steppercontrol";  // clients look for this service when discovering
-    config.apiPort = API_PORT;   
-    
+    config.apiPort = API_PORT;
+
     stepper1.name = "Stepper1";
     stepper1.pin_enable = D1;
     stepper1.pin_direction = D2;
@@ -88,15 +89,15 @@ void setup() {
 
     config.addDevice(&stepper1);
     config.addDevice(&led1);
-    
+
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
     Serial.println("-------------------------------------------------");
     delay(1000);
-    
+
     wifiManager.autoConnect(config.name);
-    
+
     Scheduler.start(&server_task);
     config.startControlTasks();
     Scheduler.start(&monitor_task);
