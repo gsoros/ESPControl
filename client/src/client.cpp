@@ -6,7 +6,7 @@
 
 const char *AP_SSID = "StepperControl";
 const char *AP_PASSWORD = NULL;
-const char *HOSTNAME = "steppercontrol.local"; 
+const char *HOSTNAME = "steppercontrol.local";
 
 const int POT_PIN = A0;
 const int POT_MIN = 0;
@@ -18,12 +18,12 @@ const int MEASUREMENT_MAX = 1024 * NUM_MEASUREMENTS;
 const int MEASUREMENT_DELAY = 1000 / MEASUREMENTS_PER_SEC;
 
 const char *wl_status[] = {
-    /*0*/ "idle", 
-    /*1*/ "no SSID available", 
-    /*2*/ "scan completed", 
-    /*3*/ "connected", 
-    /*4*/ "connection failed", 
-    /*5*/ "connection lost", 
+    /*0*/ "idle",
+    /*1*/ "no SSID available",
+    /*2*/ "scan completed",
+    /*3*/ "connected",
+    /*4*/ "connection failed",
+    /*5*/ "connection lost",
     /*6*/ "disconnected"
 };
 
@@ -47,10 +47,10 @@ void waitForWifi(int pause = 100) {
 }
 
 int httpRequest(char *url, char *response) {
-    int http_code;
+    int http_code = 0;
     WiFiClient client;
     HTTPClient http;
-    if (http.begin(client, url)) {     
+    if (http.begin(client, url)) {
         Serial.printf("[HTTP] GET %s\n", url);
         http_code = http.GET();
         if (http_code <= 0) {
@@ -60,13 +60,13 @@ int httpRequest(char *url, char *response) {
             if (http_code == HTTP_CODE_OK || http_code == HTTP_CODE_MOVED_PERMANENTLY) {
                 snprintf(response, responseBufferLength, http.getString().c_str());
                 Serial.printf("[HTTP] Response: %s\n", response);
-            }      
-        }         
+            }
+        }
         http.end();
     } else {
         Serial.println("[HTTP] Unable to connect");
     }
-    return http_code;    
+    return http_code;
 }
 
 
@@ -112,7 +112,7 @@ class CommandTask : public Task {
         WiFi.setAutoReconnect(true);
         WiFi.begin(AP_SSID, AP_PASSWORD);
         waitForWifi();
-        int err;
+        int err = 0;
         while (err != 1) {
             err = WiFi.hostByName(HOSTNAME, host_ip);
             if(err != 1) {
@@ -121,8 +121,8 @@ class CommandTask : public Task {
             }
         }
         Serial.printf(
-            "WiFi connected, our IP: %s, server IP: %s\n", 
-            WiFi.localIP().toString().c_str(), 
+            "WiFi connected, our IP: %s, server IP: %s\n",
+            WiFi.localIP().toString().c_str(),
             host_ip.toString().c_str()
         );
         char url[100];
@@ -153,10 +153,10 @@ class CommandTask : public Task {
             char url[100];
             sprintf(url, "http://%s/command?vector=%d", HOSTNAME, command);
             char response[responseBufferLength];
-            httpRequest(url, response);   
-        } 
+            httpRequest(url, response);
+        }
         else if (command_diff > 0) {
-            //Serial.printf("%d movement too small\n", command_diff); 
+            //Serial.printf("%d movement too small\n", command_diff);
         }
         delay(command_rate);
     }
@@ -167,13 +167,13 @@ class MonitorTask : public Task {
     protected:
     void loop() {
         while (!monitor_enable) {
-            delay(100); 
+            delay(100);
         }
         Serial.printf(
-            "WiFi: %s  Server: %s, measurement: %d, command: %d\n", 
-            wl_status[WiFi.status()], 
-            host_ip.toString().c_str(), 
-            measurement, 
+            "WiFi: %s  Server: %s, measurement: %d, command: %d\n",
+            wl_status[WiFi.status()],
+            host_ip.toString().c_str(),
+            measurement,
             command
         );
         delay(500);
