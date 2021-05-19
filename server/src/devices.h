@@ -117,16 +117,25 @@ class Stepper : public Device {
 
     void loop() {
        //Serial.print("--StLoo--");
+       int speed = this->speed;
+       int pause = this->calculatePause();
        while (this->enabled && (0 < this->speed)) {
             digitalWrite(this->pin_direction, (0 < this->direction) ? HIGH : LOW);
             digitalWrite(this->pin_enable, HIGH);
             digitalWrite(this->pin_step, HIGH);
             delay(this->pulse);
             digitalWrite(this->pin_step, LOW);
-            int pause = map(this->speed, this->command_min, this->command_max, this->max*2, this->min);
+            if (speed != this->speed) {
+                speed = this->speed;
+                pause = this->calculatePause();
+            }
             delay(pause);
         }
         digitalWrite(this->pin_enable, LOW);
+    }
+
+    int calculatePause() {
+        return map(this->speed, this->command_min, this->command_max, this->max*2, this->min);
     }
 };
 
