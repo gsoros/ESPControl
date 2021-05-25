@@ -73,15 +73,16 @@ class Stepper : public Device {
     }
 
     void handleApiControl() {
-        int vector = this->server->arg("vector").toInt();
-        if (vector < this->command_min) {
-            vector = this->command_min;
+        int command = this->server->arg("command").toInt();
+        //Serial.printf("Received command: %i\n", command);
+        if (command < this->command_min) {
+            command = this->command_min;
         }
-        else if (vector > this->command_max) {
-            vector = this->command_max;
+        else if (command > this->command_max) {
+            command = this->command_max;
         }
-        this->direction = vector < 0 ? -1 : 1;
-        this->speed = abs(vector);
+        this->direction = command < 0 ? -1 : 1;
+        this->speed = abs(command);
         this->enabled = this->speed > 0;
         char message[100];
         sprintf(message, "command enable: %d  direction: %d  speed: %d",
@@ -142,21 +143,26 @@ class Stepper : public Device {
 class Led : public Device {
     public:
     int pin_enable;
+    bool invert;
 
-    Led (const char *name = "Led", int pin_enable = 0) {
+    Led (const char *name = "Led", int pin_enable = 0, bool invert = false) {
         this->name = name;
         this->type = "led";
         this->pin_enable = pin_enable;
+        this->invert = invert;
     }
 
     void handleApiControl() {
         bool enabled = false;
-        /*
+        Serial.printf("enable: %s %li\n", 
+            this->server->arg("enable").c_str(), 
+            this->server->arg("enable").toInt());
         if (
-            ("t" == this->server->arg("enable").c_str()) ||   // "true"
-            (0 < this->server->arg("enable").toInt()))        // 1
+            ('t' == this->server->arg("enable").c_str()[0]) ||   // "true"
+            (0 < this->server->arg("enable").toInt()))           // 1
             enabled = true;
-        */
+        
+        if (this->invert) enabled = !enabled;
         this->enabled = enabled;
         char message[100];
         sprintf(message, "command enable: %s", this->enabled ? "true" : "false");

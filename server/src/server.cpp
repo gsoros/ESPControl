@@ -9,7 +9,8 @@
 #include "html.h"
 #include "config.h"
 
-#define API_PORT 50123                  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
+//#define API_PORT 50123                  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
+#define API_PORT 80
 #define JSON_LENGTH 1024
 
 Config config;
@@ -22,16 +23,23 @@ char configJson[JSON_LENGTH];
 
 void handleRoot() {
     server.send(200, "text/html", html);
-    Serial.println("root");
+    Serial.println("[HTTP] root");
 }
 
 void handleApiControl() {
+    //Serial.println("server.handleApiControl()");
     config.handleApiControl();
 }
 
 void handleApiConfig() {
     server.send(200, "application/json", configJson);
-    Serial.println("config");
+    Serial.println("[HTTP] config");
+}
+
+void handleNotFound() {
+    server.sendHeader("Location", "/", true);
+    server.send(302, "text/plain", "302 Moved");
+    Serial.printf("[HTTP] not found: %s\n", server.uri().c_str());
 }
 
 class ServerTask : public Task {
@@ -43,6 +51,7 @@ class ServerTask : public Task {
         server.on("/", handleRoot);
         server.on("/api/control", handleApiControl);
         server.on("/api/config", handleApiConfig);
+        server.onNotFound(handleNotFound);
         server.begin();
         if (MDNS.begin(config.name, WiFi.localIP(), 1)) { // TTL is ignored
             Serial.println("mDNS responder started");
@@ -70,7 +79,7 @@ class MonitorTask : public Task {
 
 void setup() {
     config.name = "Controller1";
-    config.rate = 100;                      // minimum number of milliseconds between commands sent by the client
+    config.rate = 500;                      // minimum number of milliseconds between commands sent by the client
     config.mdnsService = "steppercontrol";  // clients look for this service when discovering
     config.apiPort = API_PORT;
 
@@ -86,6 +95,7 @@ void setup() {
 
     led1.name = "Led1";
     led1.pin_enable = D4;
+    led1.invert = true;
 
     config.addDevice(&stepper1);
     config.addDevice(&led1);
@@ -96,7 +106,26 @@ void setup() {
     Serial.println("-------------------------------------------------");
     delay(1000);
 
-    wifiManager.autoConnect(config.name);
+    // Use wifimanager...
+    // wifiManager.autoConnect(config.name);
+
+    // ... OR create an AP ...
+    Serial.print("[WiFi AP] Setting up acces point");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(config.name);
+    Serial.print(" done, IP: ");
+    Serial.println(WiFi.softAPIP().toString().c_str());
+
+    // ... OR connect to an AP
+    // Serial.print("[WiFi] Connecting");
+    // WiFi.mode(WIFI_STA);
+    // WiFi.begin("AP_SSID", "AP_PASSWORD");
+    // while (WiFi.status() != WL_CONNECTED) {
+    //     delay(100);
+    //     Serial.print(".");
+    // }
+    // Serial.print(" connected, IP: ");
+    // Serial.println(WiFi.localIP());
 
     Scheduler.start(&server_task);
     config.startControlTasks();

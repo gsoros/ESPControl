@@ -71,7 +71,8 @@ class Config {
 
     Device *device(const char *name) {
         for (int i = 0; i < this->deviceCount; i++) {
-            if (name == this->devices[i]->name) {
+            //Serial.printf("Checking \"%s\"...\n", this->devices[i]->name);
+            if (0 == strcmp(name, this->devices[i]->name)) {
                 return this->devices[i];
             }
         }
@@ -82,7 +83,7 @@ class Config {
     //void handleApiControl(ESP8266WebServer *server) {
     void handleApiControl() {
         const char *deviceName = const_cast<char *>(this->server->arg("device").c_str());
-        //char *deviceName = "Stepper1";
+        //Serial.printf("Received control request for \"%s\"\n", deviceName);
         Device *device = this->device(deviceName);
         if (null == device) {
             Serial.printf("[Error] control request received for non-existent device \"%s\"\n", deviceName);

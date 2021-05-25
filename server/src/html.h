@@ -53,7 +53,7 @@ req.onreadystatechange = function() {
         message.innerHTML = "Getting config...";
     }
 };
-req.open("GET", "/config");
+req.open("GET", "/api/config");
 req.send();
 
 function sendCommand() {
@@ -61,7 +61,7 @@ function sendCommand() {
     var now = d.getTime();
     if ((now - lastCommand) >= rate) {
         var req = new XMLHttpRequest();
-        req.open("GET", "/command?vector=" + (run ? vector : 0), true);
+        req.open("GET", "/api/control?vector=" + (run ? vector : 0), true);
         req.send();
         lastCommand = now;
     }
