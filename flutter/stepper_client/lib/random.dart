@@ -15,5 +15,5 @@ String sentence({int maxWords = 5, int maxWordLength = 5}) {
     if (sentence.length > 0) sentence += " ";
     sentence += word(maxLength: maxWordLength);
   }
-  return sentence.toUpperCase() + ".";
+  return sentence.substring(0, 1).toUpperCase() + sentence.substring(1) + ".";
 }

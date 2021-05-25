@@ -109,13 +109,13 @@ class Led extends Device {
   List<Widget> toWidgetList() {
     return <Widget>[
       Container(
-        transform: Matrix4.rotationZ(0.1),
+        transform: Matrix4.rotationZ(0.04),
         padding: EdgeInsets.fromLTRB(20, 10, 20, 20),
         child: Row(
           children: [
             Expanded(
               child: Container(
-                transform: Matrix4.rotationZ(-0.3),
+                transform: Matrix4.rotationZ(-0.15),
                 child: Text(
                   enabled ? "🌝" : "🌚",
                   style: TextStyle(

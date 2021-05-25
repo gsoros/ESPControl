@@ -15,6 +15,9 @@
 
 Config config;
 Stepper stepper1;
+Stepper stepper2;
+Stepper stepper3;
+Stepper stepper4;
 Led led1;
 
 WiFiManager wifiManager;
@@ -93,28 +96,46 @@ void setup() {
     stepper1.command_min = -511;
     stepper1.command_max = 512;
 
+    stepper2.name = "Stepper2";
+    stepper2.pin_enable = D5;
+    stepper2.pin_direction = D6;
+    stepper2.pin_step = D7;
+    
+    stepper3.name = "Stepper3";
+    stepper3.pin_enable = D8;
+    stepper3.pin_direction = D8;
+    stepper3.pin_step = D8;
+
+    stepper4.name = "Stepper4";
+    stepper4.pin_enable = D8;
+    stepper4.pin_direction = D8;
+    stepper4.pin_step = D8;
+
     led1.name = "Led1";
     led1.pin_enable = D4;
     led1.invert = true;
 
     config.addDevice(&stepper1);
     config.addDevice(&led1);
+    config.addDevice(&stepper2);
+    config.addDevice(&stepper3);
+    config.addDevice(&stepper4);
 
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BUILTIN, HIGH);
     Serial.begin(115200);
     Serial.println("-------------------------------------------------");
     delay(1000);
 
     // Use wifimanager...
-    // wifiManager.autoConnect(config.name);
+    wifiManager.autoConnect(config.name);
 
     // ... OR create an AP ...
-    Serial.print("[WiFi AP] Setting up acces point");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(config.name);
-    Serial.print(" done, IP: ");
-    Serial.println(WiFi.softAPIP().toString().c_str());
+    // Serial.print("[WiFi AP] Setting up acces point");
+    // WiFi.mode(WIFI_AP);
+    // WiFi.softAP(config.name);
+    // Serial.print(" done, IP: ");
+    // Serial.println(WiFi.softAPIP().toString().c_str());
 
     // ... OR connect to an AP
     // Serial.print("[WiFi] Connecting");

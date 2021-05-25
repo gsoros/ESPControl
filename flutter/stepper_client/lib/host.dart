@@ -101,8 +101,10 @@ class Host {
       debugPrint("[HTTP] Request to $path OK, response: $responseBody");
       return responseBody;
     } else {
-      debugPrint(
-          "[HTTP] Request to $path failed: ${statusCode.toString()}: $responseBody");
+      var msg =
+          "[HTTP] Request to $path failed: ${statusCode.toString()} $responseBody";
+      debugPrint(msg);
+      log(msg);
     }
     return "";
   }
@@ -171,12 +173,27 @@ class Host {
   List<Widget> toWidgetList() {
     List<Widget> widgets = [];
     devices.forEach((name, device) {
-      widgets.add(Text("$name:"));
-      widgets.addAll(device.toWidgetList());
+      widgets.add(
+        Container(
+          color: Colors.black12,
+          margin: EdgeInsets.fromLTRB(4, 4, 4, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.fromLTRB(20, 0, 0, 0),
+                child: Text("$name"),
+              ),
+              ...device.toWidgetList(),
+            ],
+          ),
+        ),
+      );
     });
     if (widgets.length < 1)
       widgets.add(Text("This host has no devices configured"));
     //debugPrint("$name.toWidgetList(): $widgets");
+    widgets.add(SizedBox(height: 50));
     return widgets;
   }
 }

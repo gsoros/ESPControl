@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 //import 'package:flutter_switch/flutter_switch.dart';
 //import 'package:multicast_dns/multicast_dns.dart';
-//import 'random.dart' as random;
+import 'random.dart' as random;
 import 'host.dart';
 //import 'device.dart';
 
@@ -54,6 +54,7 @@ class _StepperHomeState extends State<StepperHome> {
     new Timer.periodic(
       const Duration(seconds: 30),
       (Timer t) {
+        //log(random.sentence(maxWords: 250, maxWordLength: 25));
         _hosts.discover();
       },
     );
@@ -82,6 +83,67 @@ class _StepperHomeState extends State<StepperHome> {
 
   @override
   Widget build(BuildContext context) {
+    var deviceWidgets = currentHostWidgetList();
+    return Scaffold(
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.fromLTRB(20, 40, 20, 10),
+                    transform: Matrix4.rotationZ(-0.14),
+                    child: _hosts.count() > 0
+                        ? DropdownButton<String>(
+                            value: _hosts.currentName(),
+                            items: _hosts.toDropdownMenuItems(),
+                            onChanged: (val) {
+                              if (null != val)
+                                setState(() {
+                                  _hosts.setCurrent(val);
+                                });
+                            },
+                          )
+                        : Text('Discovering...'),
+                  ),
+                  ...deviceWidgets,
+                ],
+              ),
+            ),
+            DraggableScrollableSheet(
+              initialChildSize: .1,
+              minChildSize: .1,
+              maxChildSize: 1,
+              expand: true,
+              builder: (BuildContext c, ScrollController sCc) {
+                return Container(
+                  color: Colors.black54,
+                  child: ListView.builder(
+                    //reverse: true,
+                    padding: EdgeInsets.all(8),
+                    controller: sCc,
+                    itemCount: _logList.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return Container(
+                        child: Text(_logList[index]),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /*
+  
+  Widget build(BuildContext context) {
+    var deviceWidgets = currentHostWidgetList();
     return Scaffold(
       /*
       appBar: AppBar(
@@ -113,26 +175,52 @@ class _StepperHomeState extends State<StepperHome> {
               ],
             ),
           ),
-          ...currentHostWidgetList(),
           Expanded(
             flex: 1,
             child: FractionallySizedBox(
               widthFactor: 1,
+              heightFactor: .75,
+              child: Container(
+                transform: Matrix4.rotationZ(-0.1),
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Scrollbar(
+                    child: ListView.builder(
+                  padding: EdgeInsets.all(8),
+                  itemCount: deviceWidgets.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return Container(
+                      child: deviceWidgets[index],
+                    );
+                  },
+                )),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: FractionallySizedBox(
+              widthFactor: 1,
+              //heightFactor: .2,
               child: Container(
                 transform: Matrix4.rotationZ(0.02),
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Scrollbar(
-                  child: ListView.builder(
-                    reverse: true,
-                    padding: EdgeInsets.all(8),
-                    itemCount: _logList.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return Container(
-                        //height: 10,
-                        child: Text(_logList[index]),
-                      );
-                    },
-                  ),
+                child: DraggableScrollableSheet(
+                  builder: (BuildContext context,
+                      ScrollController scrollController) {
+                    return Container(
+                      child: ListView.builder(
+                        reverse: true,
+                        padding: EdgeInsets.all(8),
+                        controller: scrollController,
+                        itemCount: _logList.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          return Container(
+                            child: Text(_logList[index]),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -141,4 +229,6 @@ class _StepperHomeState extends State<StepperHome> {
       ),
     );
   }
+  
+   */
 }
