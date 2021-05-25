@@ -93,12 +93,6 @@ class Config {
         device->handleApiControl();
     }
 
-    //void setup() {
-    //    for (int i = 0; i < this->deviceCount; i++) {
-    //        this->devices[i]->setup();
-    //    }
-    //}
-
     void startControlTasks() {
         for (int i = 0; i < this->deviceCount; i++) {
             Serial.printf("Starting control task for device %i\n", i);

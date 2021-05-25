@@ -85,8 +85,8 @@ class Stepper : public Device {
         this->speed = abs(command);
         this->enabled = this->speed > 0;
         char message[100];
-        sprintf(message, "command enable: %d  direction: %d  speed: %d",
-            this->enabled, this->direction, this->speed);
+        sprintf(message, "[%s] command enable: %d  direction: %d  speed: %d",
+            this->name, this->enabled, this->direction, this->speed);
         this->server->send(200, "text/plain", message);
         Serial.println(message);
     }
@@ -136,7 +136,13 @@ class Stepper : public Device {
     }
 
     int calculatePause() {
-        return map(this->speed, this->command_min, this->command_max, this->max*2, this->min);
+        return map(
+            this->speed, 
+            this->command_min, 
+            this->command_max, 
+            this->max*2, 
+            this->min
+        );
     }
 };
 
@@ -154,18 +160,19 @@ class Led : public Device {
 
     void handleApiControl() {
         bool enabled = false;
-        Serial.printf("enable: %s %li\n", 
-            this->server->arg("enable").c_str(), 
-            this->server->arg("enable").toInt());
+        //Serial.printf("[%s] enable: %s %li\n",
+        //    this->name,
+        //    this->server->arg("enable").c_str(), 
+        //    this->server->arg("enable").toInt());
         if (
             ('t' == this->server->arg("enable").c_str()[0]) ||   // "true"
             (0 < this->server->arg("enable").toInt()))           // 1
             enabled = true;
         
-        if (this->invert) enabled = !enabled;
         this->enabled = enabled;
         char message[100];
-        sprintf(message, "command enable: %s", this->enabled ? "true" : "false");
+        sprintf(message, "[%s] command enable: %s", this->name, 
+            this->enabled ? "true" : "false");
         this->server->send(200, "text/plain", message);
         Serial.println(message);
     }
@@ -181,12 +188,17 @@ class Led : public Device {
     protected:
     void setup() {
         pinMode(this->pin_enable, OUTPUT);
-        digitalWrite(this->pin_enable, LOW);
+        this->loop();
     }
 
     void loop() {
-        //Serial.print(ESP.getFreeHeap());
-        digitalWrite(this->pin_enable, this->enabled ? HIGH : LOW);
+        digitalWrite(
+            this->pin_enable, 
+            this->invert ? 
+                !this->enabled : 
+                this->enabled 
+                    ? HIGH : LOW
+        );
     }
 };
 

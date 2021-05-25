@@ -13,7 +13,6 @@ class Host {
   Function setState;
   Function log;
   Map<String, Device> devices = {};
-  //String _currentDevice = '';
   int _lastCommandTime = 0;
   int _nextCommandTime = 0;
   Map<String, Map<String, String>> _commands = {};
@@ -32,7 +31,6 @@ class Host {
     ip = host.ip;
     port = host.port;
     host.devices.forEach((deviceName, device) {
-      //devices[deviceName] = device;
       updateDevice(device);
     });
   }
@@ -44,21 +42,6 @@ class Host {
       log("New device ${device.name}");
     devices[device.name] = device;
   }
-
-  /*
-  String currentDevice() {
-    if (hasDevice(_currentDevice)) {
-      return _currentDevice;
-    }
-    return devices.isEmpty ? '' : devices.keys.first;
-  }
-
-  void setCurrentDevice(String device) {
-    if (hasDevice(device)) {
-      _currentDevice = device;
-    }
-  }
-  */
 
   bool hasDevice(String device) {
     return devices.containsKey(device);
@@ -130,7 +113,6 @@ class Host {
               }
             });
           }
-          //sendCommand();
         }
       },
       onError: (e) {

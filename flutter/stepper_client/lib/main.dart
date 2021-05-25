@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 //import 'package:flutter_switch/flutter_switch.dart';
 //import 'package:multicast_dns/multicast_dns.dart';
-import 'random.dart' as random;
+//import 'random.dart' as random;
 import 'host.dart';
 //import 'device.dart';
 
@@ -95,7 +95,8 @@ class _StepperHomeState extends State<StepperHome> {
                   Container(
                     padding: EdgeInsets.fromLTRB(20, 40, 20, 10),
                     transform: Matrix4.rotationZ(-0.14),
-                    child: _hosts.count() > 0
+                    child: 
+                      _hosts.count() > 0
                         ? DropdownButton<String>(
                             value: _hosts.currentName(),
                             items: _hosts.toDropdownMenuItems(),
@@ -139,96 +140,4 @@ class _StepperHomeState extends State<StepperHome> {
       ),
     );
   }
-
-  /*
-  
-  Widget build(BuildContext context) {
-    var deviceWidgets = currentHostWidgetList();
-    return Scaffold(
-      /*
-      appBar: AppBar(
-        title: Text('Stepper Control'),
-      ),
-      */
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        mainAxisSize: MainAxisSize.max,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: EdgeInsets.fromLTRB(20, 40, 20, 10),
-            transform: Matrix4.rotationZ(-0.02),
-            child: Row(
-              children: [
-                _hosts.count() > 0
-                    ? DropdownButton<String>(
-                        value: _hosts.currentName(),
-                        items: _hosts.toDropdownMenuItems(),
-                        onChanged: (val) {
-                          if (null != val)
-                            setState(() {
-                              _hosts.setCurrent(val);
-                            });
-                        },
-                      )
-                    : Text('Discovering...'),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: FractionallySizedBox(
-              widthFactor: 1,
-              heightFactor: .75,
-              child: Container(
-                transform: Matrix4.rotationZ(-0.1),
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Scrollbar(
-                    child: ListView.builder(
-                  padding: EdgeInsets.all(8),
-                  itemCount: deviceWidgets.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return Container(
-                      child: deviceWidgets[index],
-                    );
-                  },
-                )),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: FractionallySizedBox(
-              widthFactor: 1,
-              //heightFactor: .2,
-              child: Container(
-                transform: Matrix4.rotationZ(0.02),
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: DraggableScrollableSheet(
-                  builder: (BuildContext context,
-                      ScrollController scrollController) {
-                    return Container(
-                      child: ListView.builder(
-                        reverse: true,
-                        padding: EdgeInsets.all(8),
-                        controller: scrollController,
-                        itemCount: _logList.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return Container(
-                            child: Text(_logList[index]),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-   */
 }
