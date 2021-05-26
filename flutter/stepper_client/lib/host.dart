@@ -186,8 +186,9 @@ class Hosts {
   Function setState;
   http.Client httpClient;
   Function log;
-  //String _mDNSServiceType = '_http._tcp';
-  String _mDNSServiceType = '_steppercontrol._tcp';
+  //String _mDNSServiceType = 'http';
+  String _mDNSServiceType = 'ESPControl';
+  String _mDNSProtocol = 'tcp';
 
   Hosts(this.setState, this.httpClient, this.log);
 
@@ -314,7 +315,8 @@ class Hosts {
     await client.start();
 
     await for (final PtrResourceRecord ptr in client.lookup<PtrResourceRecord>(
-        ResourceRecordQuery.serverPointer(_mDNSServiceType))) {
+        ResourceRecordQuery.serverPointer(
+            '_' + _mDNSServiceType + '._' + _mDNSProtocol))) {
       //debugPrint('[mDNS] PTR: ${ptr.toString()}');
 
       await for (final SrvResourceRecord srv
