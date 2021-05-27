@@ -15,6 +15,7 @@ class Config {
     const char *name;
     int rate;
     const char *mdnsService;
+    const char *mdnsProtocol;
     int apiPort;
     Device *devices[MAX_DEVICES];
     int deviceCount;
@@ -24,12 +25,14 @@ class Config {
         const char *name = "Controller",
         int rate = 10,
         const char *mdnsService = "http",
+        const char *mdnsProtocol = "tcp",
         int apiPort = 50123
         ) {
         this->deviceCount = 0;
         this->name = name;
         this->rate = rate;
         this->mdnsService = mdnsService;
+        this->mdnsProtocol = mdnsProtocol;
         this->apiPort = apiPort;
         this->server = null;
     }

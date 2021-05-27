@@ -1,34 +1,30 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
+#include <Scheduler.h>                      // https://github.com/nrwiersma/ESP8266Scheduler
+#include <WiFiManager.h>                    // https://github.com/tzapu/WiFiManager
+#include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
-#include <ArduinoJson.h>                // https://github.com/bblanchon/ArduinoJson
+#include <ArduinoJson.h>                    // https://github.com/bblanchon/ArduinoJson
 
-const char *AP_SSID = "StepperControl";
-const char *AP_PASSWORD = NULL;
-const char *HOSTNAME = "steppercontrol.local";
+#define RESPONSE_BUF_SIZE 1024
+
+const char *NAME = "Remote1";               // Our name
+const char *MDNS_SERVICE = "ESPControl";    // Look for this service
+const char *MDNS_PROTOCOL = "tcp";        
+const char *HOST = "Controller1";           // Look for this host to control
+const char *DEVICE = "Stepper1";            // Look for this device to control
 
 const int POT_PIN = A0;
 const int POT_MIN = 0;
 const int POT_MAX = 1024;
-const int MOVEMENT_MIN = 2;             // minimum movement of the pot
-const int MEASUREMENTS_PER_SEC = 10;    // maximum number of pot measurements per second
-const int NUM_MEASUREMENTS = 64;        // number of analog measurements to average
+const int MOVEMENT_MIN = 2;                 // minimum movement of the pot
+const int MEASUREMENTS_PER_SEC = 10;        // maximum number of pot measurements per second
+const int NUM_MEASUREMENTS = 64;            // number of analog measurements to average
 const int MEASUREMENT_MAX = 1024 * NUM_MEASUREMENTS;
 const int MEASUREMENT_DELAY = 1000 / MEASUREMENTS_PER_SEC;
 
-const char *wl_status[] = {
-    /*0*/ "idle",
-    /*1*/ "no SSID available",
-    /*2*/ "scan completed",
-    /*3*/ "connected",
-    /*4*/ "connection failed",
-    /*5*/ "connection lost",
-    /*6*/ "disconnected"
-};
-
-int command_rate = 500;
+int command_rate = 1000;
 int command_min = -100;
 int command_max = 100;
 int measurement_total;
@@ -38,14 +34,10 @@ int last_command = (command_min + command_max) / 2;
 int command = last_command;
 int command_diff = 0;
 bool monitor_enable = false;
-int responseBufferLength = 255;
 IPAddress host_ip;
+int host_port;
 
-void waitForWifi(int pause = 100) {
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(pause);
-    }
-}
+WiFiManager wifiManager;
 
 int httpRequest(char *url, char *response) {
     int http_code = 0;
@@ -59,7 +51,7 @@ int httpRequest(char *url, char *response) {
         } else {
             Serial.printf("[HTTP] GET... code: %d\n", http_code);
             if (http_code == HTTP_CODE_OK || http_code == HTTP_CODE_MOVED_PERMANENTLY) {
-                snprintf(response, responseBufferLength, http.getString().c_str());
+                snprintf(response, RESPONSE_BUF_SIZE, http.getString().c_str());
                 Serial.printf("[HTTP] Response: %s\n", response);
             }
         }
@@ -70,14 +62,12 @@ int httpRequest(char *url, char *response) {
     return http_code;
 }
 
-
 class MeasureTask : public Task {
     protected:
     void setup() {
         pinMode(POT_PIN, INPUT);
     }
     void loop() {
-        waitForWifi();
         for (int x = 0; x < NUM_MEASUREMENTS; x++) {
             measurement_total += analogRead(POT_PIN);
         }
@@ -102,58 +92,86 @@ class MeasureTask : public Task {
     }
 } measure_task;
 
-
 class CommandTask : public Task {
     protected:
     void setup() {
-        Serial.printf("Connecting to %s\n", AP_SSID);
-        Serial.flush();
-        WiFi.mode(WIFI_STA);
-        WiFi.setAutoConnect(true);
-        WiFi.setAutoReconnect(true);
-        WiFi.begin(AP_SSID, AP_PASSWORD);
-        waitForWifi();
-        int err = 0;
-        while (err != 1) {
-            err = WiFi.hostByName(HOSTNAME, host_ip);
-            if(err != 1) {
-                Serial.printf("Error getting server IP address, code: %i\n", err);
-                delay(500);
+
+        // Find host to control
+        MDNS.begin(NAME);
+        bool found = false;
+        int tries = 0;
+        while (!found) {
+            tries++;
+            Serial.printf("Sending mDNS query (try %i)\n", tries);
+            int n = MDNS.queryService(MDNS_SERVICE, MDNS_PROTOCOL);
+            if (n == 0) {
+                Serial.println("no services found");
+            } else {
+                Serial.printf("%i service%s found\n", n, n > 1 ? "s" : "");
+                for (int i = 0; i < n; ++i) {
+                    Serial.print(i + 1);
+                    Serial.print(": ");
+                    char search[64];
+                    snprintf(search, 64, "%s.local", HOST);
+                    if (0 == strcmp(search, MDNS.answerHostname(i))) {
+                        Serial.print("*****");
+                        host_ip = MDNS.answerIP(i);
+                        host_port = MDNS.answerPort(i);
+                        found = true;
+                    }
+                    Serial.print(MDNS.answerHostname(i));
+                    Serial.print(" (");
+                    Serial.print(MDNS.answerIP(i));
+                    Serial.print(":");
+                    Serial.print(MDNS.answerPort(i));
+                    Serial.println(")");
+                }
             }
+            Serial.println();
+            if (1 < tries) delay(1000);
         }
-        Serial.printf(
-            "WiFi connected, our IP: %s, server IP: %s\n",
-            WiFi.localIP().toString().c_str(),
-            host_ip.toString().c_str()
-        );
+        
         char url[100];
-        sprintf(url, "http://%s/config", HOSTNAME);
-        char response[responseBufferLength];
+        sprintf(url, "http://%s:%i/api/config", host_ip.toString().c_str(), host_port);
+        char response[RESPONSE_BUF_SIZE];
         int http_code = httpRequest(url, response);
         if (http_code == HTTP_CODE_OK) {
             Serial.print("[Config] code OK\n");
-            StaticJsonDocument<200> conf;
+            StaticJsonDocument<512> conf;
             deserializeJson(conf, response);
-            const char *confName = conf["name"];
-            Serial.printf("[Config] host is %s\n", confName);
-            Serial.printf("[Config] old values: min %i, max %i, rate %i\n", command_min, command_max, command_rate);
-            command_min = conf["min"];
-            command_max = conf["max"];
-            command_rate = conf["rate"];
-            Serial.printf("[Config] new values: min %i, max %i, rate %i\n", command_min, command_max, command_rate);
+            if (conf.containsKey("rate") && conf["rate"].is<int>()) {
+                command_rate = conf["rate"];
+                Serial.printf("Rate: %i\n", command_rate);
+            }
+            if (conf.containsKey("devices")) {
+                if (NULL != conf["devices"]) {
+                    for (uint i=0; i<conf["devices"].size(); i++) {
+                        if (conf["devices"][i]["name"] == DEVICE) {
+                            Serial.println("Device found");
+                            if (conf["devices"][i]["command_min"].is<int>()) 
+                                command_min = conf["devices"][i]["command_min"];
+                            if (conf["devices"][i]["command_max"].is<int>()) 
+                                command_max = conf["devices"][i]["command_max"];
+                            Serial.printf("Device command min: %i, max: %i\n", command_min, command_max);
+                            break;
+                        }
+                    }
+                }
+            }
         }
         monitor_enable = true;
     }
     void loop() {
-        waitForWifi();
+
         command = map(measurement, POT_MIN, POT_MAX, command_min, command_max);
         command_diff = abs(last_command - command);
         if (command_diff > MOVEMENT_MIN) {
             last_command = command;
             Serial.printf("Sending command: %d\n", command);
             char url[100];
-            sprintf(url, "http://%s/command?vector=%d", HOSTNAME, command);
-            char response[responseBufferLength];
+            sprintf(url, "http://%s:%i/api/control?device=%s&command=%i", 
+                host_ip.toString().c_str(), host_port, DEVICE, command);
+            char response[RESPONSE_BUF_SIZE];
             httpRequest(url, response);
         }
         else if (command_diff > 0) {
@@ -163,7 +181,6 @@ class CommandTask : public Task {
     }
 } command_task;
 
-
 class MonitorTask : public Task {
     protected:
     void loop() {
@@ -171,16 +188,14 @@ class MonitorTask : public Task {
             delay(100);
         }
         Serial.printf(
-            "WiFi: %s  Server: %s, measurement: %d, command: %d\n",
-            wl_status[WiFi.status()],
+            "Server: %s, measurement: %d, command: %d\n",
             host_ip.toString().c_str(),
             measurement,
             command
         );
-        delay(500);
+        delay(1000);
     }
 } monitor_task;
-
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -190,6 +205,9 @@ void setup() {
         Serial.println("-----------------------------------------");
     }
     delay(1000);
+
+    wifiManager.autoConnect(NAME);
+
     Scheduler.start(&monitor_task);
     Scheduler.start(&measure_task);
     Scheduler.start(&command_task);

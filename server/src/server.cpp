@@ -61,7 +61,7 @@ class ServerTask : public Task {
         } else {
             Serial.println("Error setting up MDNS responder");
         }
-        MDNS.addService(config.mdnsService, "tcp", config.apiPort);
+        MDNS.addService(config.mdnsService, config.mdnsProtocol, config.apiPort);
     }
     void loop()  {
         server.handleClient();
@@ -83,7 +83,7 @@ class MonitorTask : public Task {
 void setup() {
     config.name = "Controller1";
     config.rate = 500;                      // minimum number of milliseconds between commands sent by the client
-    config.mdnsService = "steppercontrol";  // clients look for this service when discovering
+    config.mdnsService = "ESPControl";      // clients look for this service when discovering
     config.apiPort = API_PORT;
 
     stepper1.name = "Stepper1";
