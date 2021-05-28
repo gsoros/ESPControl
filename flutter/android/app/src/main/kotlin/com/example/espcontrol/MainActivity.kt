@@ -1,4 +1,4 @@
-package com.example.stepper_client
+package com.example.espcontrol
 
 import io.flutter.embedding.android.FlutterActivity
 

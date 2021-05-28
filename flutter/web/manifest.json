@@ -1,6 +1,6 @@
 {
-    "name": "stepper_client",
-    "short_name": "stepper_client",
+    "name": "espcontrol",
+    "short_name": "espcontrol",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

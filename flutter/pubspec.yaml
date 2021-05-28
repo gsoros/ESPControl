@@ -1,4 +1,4 @@
-name: stepper_client
+name: espcontrol
 description: Client App for the ESP Stepper Controller
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
