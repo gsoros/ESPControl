@@ -6,26 +6,26 @@
 #include <WiFiManager.h>                // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
-#include "html.h"
+#include "index.html.h"
 #include "config.h"
 
 //#define API_PORT 50123                  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
 #define API_PORT 80
 #define JSON_LENGTH 1024
+#define HTML_LENGTH 4096
 
 Config config;
 Stepper stepper1;
 Stepper stepper2;
-Stepper stepper3;
-Stepper stepper4;
 Led led1;
 
 WiFiManager wifiManager;
 ESP8266WebServer server(API_PORT);
 char configJson[JSON_LENGTH];
+char indexHtml[HTML_LENGTH];
 
 void handleRoot() {
-    server.send(200, "text/html", html);
+    server.send(200, "text/html", indexHtml);
     Serial.println("[HTTP] root");
 }
 
@@ -35,6 +35,7 @@ void handleApiControl() {
 }
 
 void handleApiConfig() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
     server.send(200, "application/json", configJson);
     Serial.println("[HTTP] config");
 }
@@ -101,16 +102,6 @@ void setup() {
     stepper2.pin_direction = D6;
     stepper2.pin_step = D7;
     
-    stepper3.name = "Stepper3";
-    stepper3.pin_enable = D8;
-    stepper3.pin_direction = D8;
-    stepper3.pin_step = D8;
-
-    stepper4.name = "Stepper4";
-    stepper4.pin_enable = D8;
-    stepper4.pin_direction = D8;
-    stepper4.pin_step = D8;
-
     led1.name = "Led1";
     led1.pin_enable = D4;
     led1.invert = true;
@@ -118,9 +109,7 @@ void setup() {
     config.addDevice(&stepper1);
     config.addDevice(&led1);
     config.addDevice(&stepper2);
-    config.addDevice(&stepper3);
-    config.addDevice(&stepper4);
-
+    
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
     Serial.begin(115200);
@@ -147,6 +136,16 @@ void setup() {
     // }
     // Serial.print(" connected, IP: ");
     // Serial.println(WiFi.localIP());
+
+    Serial.printf("Processing index.html template: %i\n",
+        snprintf(
+            indexHtml, 
+            HTML_LENGTH, 
+            indexHtmlTemplate, 
+            WiFi.localIP().toString().c_str(), 
+            API_PORT
+        )
+    );
 
     Scheduler.start(&server_task);
     config.startControlTasks();

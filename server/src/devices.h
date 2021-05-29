@@ -22,7 +22,9 @@ class Device : public Task {
         this->server = null;
     }
 
-    virtual void handleApiControl(){};
+    virtual void handleApiControl() {
+        this->server->sendHeader("Access-Control-Allow-Origin", "*");
+    };
 
     virtual JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
         JSONVar j;
@@ -73,6 +75,7 @@ class Stepper : public Device {
     }
 
     void handleApiControl() {
+        Device::handleApiControl();
         int command = this->server->arg("command").toInt();
         //Serial.printf("Received command: %i\n", command);
         if (command < this->command_min) {
@@ -159,6 +162,7 @@ class Led : public Device {
     }
 
     void handleApiControl() {
+        Device::handleApiControl();
         bool enabled = false;
         //Serial.printf("[%s] enable: %s %li\n",
         //    this->name,
