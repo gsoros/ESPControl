@@ -138,7 +138,7 @@ void setup() {
     // Serial.println(WiFi.localIP());
 
     Serial.printf("Processing index.html template: %i\n",
-        snprintf(
+        snprintf_P(
             indexHtml, 
             HTML_LENGTH, 
             indexHtmlTemplate, 
