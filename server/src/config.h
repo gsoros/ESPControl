@@ -34,7 +34,7 @@ class Config {
         this->mdnsService = mdnsService;
         this->mdnsProtocol = mdnsProtocol;
         this->apiPort = apiPort;
-        this->server = null;
+        this->server = nullptr;
     }
 
     void setServer(ESP8266WebServer *server) {
@@ -67,7 +67,7 @@ class Config {
     Device *device(int i) {
         if (i > this->deviceCount) {
             Serial.printf("[Error] Device %i not found.\n", i);
-            return null;
+            return nullptr;
         }
         return this->devices[i];
     }
@@ -80,7 +80,7 @@ class Config {
             }
         }
         Serial.printf("[Error] Device \"%s\" not found.\n", name);
-        return null;
+        return nullptr;
     }
 
     //void handleApiControl(ESP8266WebServer *server) {
@@ -88,7 +88,7 @@ class Config {
         const char *deviceName = const_cast<char *>(this->server->arg("device").c_str());
         //Serial.printf("Received control request for \"%s\"\n", deviceName);
         Device *device = this->device(deviceName);
-        if (null == device) {
+        if (nullptr == device) {
             Serial.printf("[Error] control request received for non-existent device \"%s\"\n", deviceName);
             this->server->send(500, "text/plain", "Device does not exist");
             return;

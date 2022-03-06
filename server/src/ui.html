@@ -1,32 +1,26 @@
 <!DOCTYPE html>
-<!-- NOTE sprintf format (%%!) -->
 <html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
 
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
     <p id="message"></p>
     <div id="devices" style="text-align: left">
     </div>
-
     <script>
-        /*
-        var host = "192.168.43.237";
-        var port = 80;
-        */
-        var host = "%s";
-        var port = "%i";
+        var urlBase = "http://%s:%i/";
         var rate = 1000;
         var commands = [];
         var lastCommands = [];
-        var nextCommands =[];
+        var nextCommands = [];
         var enabled = [];
         var types = [];
-
         var req = new XMLHttpRequest();
+
         function getConfig() {
-            req.onreadystatechange = function() {
+            req.onreadystatechange = function () {
                 if (this.readyState == 4) {
                     if (this.status == 200) {
                         var response = JSON.parse(this.responseText);
@@ -36,11 +30,11 @@
                         }
                         if ('number' == typeof response.rate) {
                             rate = response.rate;
-                            message.innerHTML += "<br>Command rate is " + 1000/rate + "/s.";
+                            message.innerHTML += "<br>Command rate is " + 1000 / rate + "/s.";
                         }
                         if (0 < response.devices.length) {
                             response.devices.forEach(device => {
-                                types[device.name] = device.type; 
+                                types[device.name] = device.type;
                                 switch (device.type) {
                                     case "stepper":
                                         addStepper(device.name, device.command_min, device.command_max);
@@ -49,21 +43,23 @@
                                         addLed(device.name);
                                         break;
                                     default:
-                                        message.innerHTML +=  device.name + ": unknown device type";
+                                        message.innerHTML += device.name + ": unknown device type";
                                 }
                             });
                         }
                     }
                     else {
-                        message.innerHTML = 'Failed to get config, server replied: "' 
-                        + this.responseText + '".<br><button onClick="getConfig()">Retry</button>';
+                        message.innerHTML = 'Failed to get config, server replied: "'
+                            + this.responseText + '".<br><button onClick="getConfig()">Retry</button>';
                     }
                 }
                 else {
                     message.innerHTML = "Getting config...";
                 }
             };
-            req.open("GET", "http://" + host + ":" + port + "/api/config");
+            var url = urlBase + "api/config";
+            console.log(url);
+            req.open("GET", url);
             req.send();
         }
         getConfig();
@@ -114,7 +110,7 @@
             var cb = document.createElement("input");
             cb.type = "checkbox";
             cb.id = name + "_enabled";
-            cb.style.margin= "0";
+            cb.style.margin = "0";
             cb.onchange = function () {
                 enabled[name] = this.checked;
                 console.log("enabled[" + name + "]=" + enabled[name]);
@@ -137,7 +133,7 @@
             if (undefined == nextCommands[device]) nextCommands[device] = 0;
             if ((now - lastCommands[device]) >= rate) {
                 var req = new XMLHttpRequest();
-                var url = "http://" + host + ":" + port + "/api/control?device=" + device + "&";
+                var url = urlBase + "api/control?device=" + device + "&";
                 switch (types[device]) {
                     case "stepper":
                         url += "command=" + (enabled[device] ? commands[device] : 0);
@@ -160,6 +156,6 @@
             }
         }
     </script>
-
 </body>
+
 </html>

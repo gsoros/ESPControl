@@ -2,9 +2,9 @@
 #define CONFIG_H
 
 #include <ESP8266HTTPClient.h>
-#include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
+#include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 #include <ESP8266mDNS.h>
-#include <ArduinoJson.h>                // https://github.com/bblanchon/ArduinoJson
+#include <ArduinoJson.h>  // https://github.com/bblanchon/ArduinoJson
 #include "devices.h"
 #include "request.h"
 
@@ -12,7 +12,7 @@
 #define JSON_CONF_SIZE 512
 
 class Config : public Task, public Request {
-    public:
+   public:
     const char *name;
     const char *mdnsService;
     const char *mdnsProtocol;
@@ -23,8 +23,7 @@ class Config : public Task, public Request {
     Config(
         const char *name = "Remote",
         const char *mdnsService = "http",
-        const char *mdnsProtocol = "tcp"
-        ) {
+        const char *mdnsProtocol = "tcp") {
         this->deviceCount = 0;
         this->name = name;
         this->mdnsService = mdnsService;
@@ -60,7 +59,7 @@ class Config : public Task, public Request {
 
     Device *device(const char *name) {
         for (int i = 0; i < this->deviceCount; i++) {
-            //Serial.printf("Checking \"%s\"...\n", this->devices[i]->name);
+            // Serial.printf("Checking \"%s\"...\n", this->devices[i]->name);
             if (0 == strcmp(name, this->devices[i]->name)) {
                 return this->devices[i];
             }
@@ -69,32 +68,34 @@ class Config : public Task, public Request {
         return NULL;
     }
 
-    protected:
+   protected:
     void setup() {
-        for (int i = 0; i < this->deviceCount; i++) {
-            Serial.printf("Starting task for device %s\n", this->devices[i]->name);
-            this->devices[i]->startTasks();
-        }
+        Serial.println("Config::setup");
     }
 
     void loop() {
-        bool discoverMDNS = false;
+        int hostsNotFound = 0;
         for (int i = 0; i < this->deviceCount; i++) {
-            if (!this->devices[i]->hostAvailable) {
-                discoverMDNS = true;
-                break;
+            if (0 != strcmp(this->devices[i]->host, "") && !this->devices[i]->hostAvailable) {
+                hostsNotFound++;
             }
         }
-        if (!discoverMDNS) {
+        if (0 == hostsNotFound) {
+            // Serial.println("No discovery needed");
             delay(this->discoveryLoopDelay);
             return;
         }
         MDNS.begin(this->name);
         int hostsFound = 0;
         int tries = 0;
-        while (hostsFound < this->deviceCount) {
+        while (hostsFound < hostsNotFound) {
             tries++;
-            Serial.printf("Sending mDNS query (try %i)\n", tries);
+            Serial.printf(
+                "Sending mDNS query (try %i, not found %i, found %i)\n",
+                tries,
+                hostsNotFound,
+                hostsFound);
+            Serial.flush();
             int numServices = MDNS.queryService(this->mdnsService, this->mdnsProtocol);
             if (numServices == 0) {
                 Serial.println("no services found");
@@ -103,7 +104,8 @@ class Config : public Task, public Request {
                 int deviceHostMap[this->deviceCount];
                 for (int s = 0; s < numServices; ++s) {
                     Serial.printf("%i: ", s + 1);
-                    for (int d = 0; d < this->deviceCount; d++) { 
+                    for (int d = 0; d < this->deviceCount; d++) {
+                        if (0 == strcmp(this->devices[d]->host, "")) continue;
                         char search[64];
                         snprintf(search, 64, "%s.local", this->devices[d]->host);
                         if (0 == strcmp(search, MDNS.answerHostname(s))) {
@@ -114,16 +116,14 @@ class Config : public Task, public Request {
                             hostsFound++;
                         }
                     }
-                    Serial.printf("%s(%s:%i)\n", 
-                        MDNS.answerHostname(s),
-                        MDNS.answerIP(s).toString().c_str(),
-                        MDNS.answerPort(s)
-                    );
+                    Serial.printf("%s(%s:%i)\n",
+                                  MDNS.answerHostname(s),
+                                  MDNS.answerIP(s).toString().c_str(),
+                                  MDNS.answerPort(s));
                     char url[100];
-                    sprintf(url, "http://%s:%i/api/config", 
-                        MDNS.answerIP(s).toString().c_str(), 
-                        MDNS.answerPort(s)
-                    );
+                    sprintf(url, "http://%s:%i/api/config",
+                            MDNS.answerIP(s).toString().c_str(),
+                            MDNS.answerPort(s));
                     char response[this->responseBufSize];
                     int http_code = this->requestGet(url, response);
                     if (http_code == HTTP_CODE_OK) {
@@ -136,7 +136,7 @@ class Config : public Task, public Request {
                                     this->devices[d]->hostAvailable = true;
                                 }
                             }
-                        }   
+                        }
                     }
                 }
             }

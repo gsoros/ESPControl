@@ -2,35 +2,38 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
-#include <Scheduler.h>                  // https://github.com/nrwiersma/ESP8266Scheduler
-#include <WiFiManager.h>                // https://github.com/tzapu/WiFiManager
+#include <Scheduler.h>    // https://github.com/nrwiersma/ESP8266Scheduler
+#include <WiFiManager.h>  // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
-#include "index.html.h"
+#include "ui.html.h"
 #include "config.h"
 
-//#define API_PORT 50123                  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
-#define API_PORT 80
+#define NAME "Controller1"
+#define AP_PASSWORD "espControlServer001"
+#define MDNS_SERVICE "ESPControl"
+#define API_PORT 50123  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
+//#define API_PORT 80
 #define JSON_LENGTH 1024
-#define HTML_LENGTH 4096
+#define HTML_LENGTH 8192
 
 Config config;
 Stepper stepper1;
-Stepper stepper2;
-Led led1;
+// Stepper stepper2;
+// Led led1;
 
 WiFiManager wifiManager;
 ESP8266WebServer server(API_PORT);
 char configJson[JSON_LENGTH];
 char indexHtml[HTML_LENGTH];
 
-void handleRoot() {
+void handleWebUI() {
     server.send(200, "text/html", indexHtml);
-    Serial.println("[HTTP] root");
+    Serial.println("[HTTP] WebUI");
 }
 
 void handleApiControl() {
-    //Serial.println("server.handleApiControl()");
+    // Serial.println("server.handleApiControl()");
     config.handleApiControl();
 }
 
@@ -41,75 +44,76 @@ void handleApiConfig() {
 }
 
 void handleNotFound() {
-    server.sendHeader("Location", "/", true);
-    server.send(302, "text/plain", "302 Moved");
     Serial.printf("[HTTP] not found: %s\n", server.uri().c_str());
+    if (0 == strcmp("/favicon.ico", server.uri().c_str())) {
+        server.send(404, "text/plain", "404 Not found");
+        return;
+    }
+    server.sendHeader("Location", "/ui", true);
+    server.send(302, "text/plain", "302 Moved");
 }
 
 class ServerTask : public Task {
-    protected:
+   protected:
     void setup() {
         config.setServer(&server);
-        if (strlcpy(configJson, config.toJsonString(CONFIG_MODE_PUBLIC).c_str(), JSON_LENGTH) > JSON_LENGTH)
-            Serial.println("[ERROR] Json buffer too small");
-        server.on("/", handleRoot);
+        strncpy(configJson, config.toJsonString(CONFIG_MODE_PUBLIC).c_str(), JSON_LENGTH);
+        server.on("/ui", handleWebUI);
         server.on("/api/control", handleApiControl);
         server.on("/api/config", handleApiConfig);
         server.onNotFound(handleNotFound);
         server.begin();
-        if (MDNS.begin(config.name, WiFi.localIP(), 1)) { // TTL is ignored
+        if (MDNS.begin(config.name, WiFi.localIP(), 1)) {  // TTL is ignored
             Serial.println("mDNS responder started");
         } else {
             Serial.println("Error setting up MDNS responder");
         }
         MDNS.addService(config.mdnsService, config.mdnsProtocol, config.apiPort);
     }
-    void loop()  {
+    void loop() {
         server.handleClient();
         MDNS.update();
     }
 } server_task;
 
-
 class MonitorTask : public Task {
-    protected:
+   protected:
     void loop() {
-        //Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n",
-        //    WiFi.localIP().toString().c_str(), stepper_enable, stepper_direction, stepper_speed);
+        // Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n",
+        //     WiFi.localIP().toString().c_str(), stepper_enable, stepper_direction, stepper_speed);
         delay(5000);
     }
 } monitor_task;
 
-
 void setup() {
-    config.name = "Controller1";
-    config.rate = 500;                      // minimum number of milliseconds between commands sent by the client
-    config.mdnsService = "ESPControl";      // clients look for this service when discovering
-    config.apiPort = API_PORT;
+    config.name = NAME;                 // server name
+    config.rate = 500;                  // minimum number of milliseconds between commands sent by the client
+    config.mdnsService = MDNS_SERVICE;  // clients look for this service when discovering
+    config.apiPort = API_PORT;          //
 
     stepper1.name = "Stepper1";
     stepper1.pin_enable = D1;
     stepper1.pin_direction = D2;
-    stepper1.pin_step = D3;
-    stepper1.min = 10;              // minimum delay between pulses: fastest speed
-    stepper1.max = 1000;            // maximum delay between pulses: slowest speed
-    stepper1.pulse = 10;            // pulse width
+    stepper1.pin_pulse = D3;
+    stepper1.min = 10;    // minimum delay between pulses: fastest speed
+    stepper1.max = 1000;  // maximum delay between pulses: slowest speed
+    stepper1.pulse = 0;   // minimum pulse width
     stepper1.command_min = -511;
     stepper1.command_max = 512;
 
-    stepper2.name = "Stepper2";
-    stepper2.pin_enable = D5;
-    stepper2.pin_direction = D6;
-    stepper2.pin_step = D7;
-    
-    led1.name = "Led1";
-    led1.pin_enable = D4;
-    led1.invert = true;
+    // stepper2.name = "Stepper2";
+    // stepper2.pin_enable = D5;
+    // stepper2.pin_direction = D6;
+    // stepper2.pin_pulse = D7;
+
+    // led1.name = "Led1";
+    // led1.pin_enable = D4;
+    // led1.invert = true;
 
     config.addDevice(&stepper1);
-    config.addDevice(&led1);
-    config.addDevice(&stepper2);
-    
+    // config.addDevice(&led1);
+    // config.addDevice(&stepper2);
+
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
     Serial.begin(115200);
@@ -117,14 +121,16 @@ void setup() {
     delay(1000);
 
     // Use wifimanager...
-    wifiManager.autoConnect(config.name);
+    // WiFiManagerParameter custom_text("<a href=\"/ui\">ESPControlServer UI</a>");
+    // wifiManager.addParameter(&custom_text);
+    // wifiManager.autoConnect(config.name, AP_PASSWORD);
 
     // ... OR create an AP ...
-    // Serial.print("[WiFi AP] Setting up acces point");
-    // WiFi.mode(WIFI_AP);
-    // WiFi.softAP(config.name);
-    // Serial.print(" done, IP: ");
-    // Serial.println(WiFi.softAPIP().toString().c_str());
+    Serial.print("[WiFi AP] Setting up acces point");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(config.name, AP_PASSWORD);
+    Serial.print(" done, IP: ");
+    Serial.println(WiFi.softAPIP().toString().c_str());
 
     // ... OR connect to an AP
     // Serial.print("[WiFi] Connecting");
@@ -138,14 +144,14 @@ void setup() {
     // Serial.println(WiFi.localIP());
 
     Serial.printf("Processing index.html template: %i\n",
-        snprintf_P(
-            indexHtml, 
-            HTML_LENGTH, 
-            indexHtmlTemplate, 
-            WiFi.localIP().toString().c_str(), 
-            API_PORT
-        )
-    );
+                  snprintf_P(
+                      indexHtml,
+                      HTML_LENGTH,
+                      indexHtmlTemplate,
+                      WIFI_STA == WiFi.getMode()               //
+                          ? WiFi.localIP().toString().c_str()  //
+                          : WiFi.softAPIP().toString().c_str(),
+                      API_PORT));
 
     Scheduler.start(&server_task);
     config.startControlTasks();
