@@ -9,10 +9,7 @@
 #include "config.h"
 #include "devices.h"
 
-Config config("Remote1", "Controller1", "espControlServer001", "ESPControl");
-
-Adafruit_SSD1306 display(128, 32, &Wire, -1);
-Oled oled(&display);
+Config config("Remote1", "Controller1", "Yoh9Ge2goucoo2la", "ESPControl");
 
 Switch enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
@@ -26,22 +23,48 @@ void IRAM_ATTR directionSwitchChanged() {
     Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
 }
 
-PotWithOled speedPot(&oled, "Speed", A0, "Controller1", "Stepper1");
+Pot speedPot("Speed", A0, "Controller1", "Stepper1");
 
-// DeviceCommandTask commandTask(&speedPot);
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
 
-WiFiManager wifiManager;
+Adafruit_SSD1306 display(128, 32, &Wire, -1);
+OledWithPotAndWifi oled(&display, &speedPot);
+
+// WiFiManager wifiManager;
+
+WiFiEventHandler connectedHandler;
+WiFiEventHandler disconnectedHandler;
+WiFiEventHandler softAPStationConnectedHandler;
+WiFiEventHandler softAPStationDisconnectedHandler;
+
+void onConnected(const WiFiEventStationModeConnected& evt) {
+    Serial.println("WiFi connected");
+    oled.wifiConnected = 1;
+}
+void onDisconnected(const WiFiEventStationModeDisconnected& evt) {
+    Serial.println("WiFi disconnected");
+    oled.wifiConnected = 0;
+}
+void onStationConnected(const WiFiEventSoftAPModeStationConnected& evt) {
+    Serial.println("Station connected");
+    oled.wifiConnected++;
+}
+void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt) {
+    Serial.println("Station disconnected");
+    oled.wifiConnected--;
+}
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
-    for (int x = 0; x < 5; x++) {
-        Serial.println("-----------------------------------------");
-    }
 
     Wire.begin(D2, D1);  // oled uses I2C
+
+    connectedHandler = WiFi.onStationModeConnected(&onConnected);
+    disconnectedHandler = WiFi.onStationModeDisconnected(&onDisconnected);
+    softAPStationConnectedHandler = WiFi.onSoftAPModeStationConnected(&onStationConnected);
+    softAPStationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(&onStationDisconnected);
 
     config.addDevice(&enableSwitch);
     attachInterrupt(digitalPinToInterrupt(enableSwitch.pin), enableSwitchChanged, CHANGE);

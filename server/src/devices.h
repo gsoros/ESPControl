@@ -74,7 +74,6 @@ class Stepper : public Device {
             return;
         }
         int command = server->arg("command").toInt();
-        // Serial.printf("Received command: %i\n", command);
         if (command < commandMin)
             command = commandMin;
         else if (command > commandMax)
@@ -148,8 +147,6 @@ class Stepper : public Device {
             if (command < setPoint)  // overshoot
                 command = setPoint;
         }
-        if (0 == command && 0 != setPoint)  // avoid 0 as it stops the control loop
-            command = 0 < setPoint ? 1 : -1;
     }
 
     unsigned long calculatePause() {

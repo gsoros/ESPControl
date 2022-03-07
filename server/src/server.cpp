@@ -10,7 +10,7 @@
 #include "config.h"
 
 #define NAME "Controller1"
-#define AP_PASSWORD "espControlServer001"
+#define AP_PASSWORD "Yoh9Ge2goucoo2la"
 #define MDNS_SERVICE "ESPControl"
 #define API_PORT 50123  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
 //#define API_PORT 80
@@ -51,6 +51,24 @@ void handleNotFound() {
     }
     server.sendHeader("Location", "/ui", true);
     server.send(302, "text/plain", "302 Moved");
+}
+
+WiFiEventHandler connectedHandler;
+WiFiEventHandler disconnectedHandler;
+WiFiEventHandler softAPStationConnectedHandler;
+WiFiEventHandler softAPStationDisconnectedHandler;
+
+void onConnected(const WiFiEventStationModeConnected& evt) {
+    Serial.println("WiFi connected");
+}
+void onDisconnected(const WiFiEventStationModeDisconnected& evt) {
+    Serial.println("WiFi disconnected");
+}
+void onStationConnected(const WiFiEventSoftAPModeStationConnected& evt) {
+    Serial.println("Station connected");
+}
+void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt) {
+    Serial.println("Station disconnected");
 }
 
 class ServerTask : public Task {
@@ -127,8 +145,11 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
-    Serial.println("-------------------------------------------------");
-    delay(1000);
+
+    connectedHandler = WiFi.onStationModeConnected(&onConnected);
+    disconnectedHandler = WiFi.onStationModeDisconnected(&onDisconnected);
+    softAPStationConnectedHandler = WiFi.onSoftAPModeStationConnected(&onStationConnected);
+    softAPStationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(&onStationDisconnected);
 
     // Use wifimanager...
     // WiFiManagerParameter custom_text("<br /><a href=\"/ui\">ESPControlServer UI</a>");

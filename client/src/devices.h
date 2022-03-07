@@ -230,11 +230,12 @@ class Oled : public Task {
         this->display = display;
     }
 
-    void write(const char *text) {
-        display->clearDisplay();
+    void writeText(const char *text, int cursorX = 0, int cursorY = 0, bool clear = true) {
+        if (clear)
+            display->fillRect(cursorX, cursorY, width - cursorX, height - cursorY, SSD1306_BLACK);
         display->setTextSize(4);
         display->setTextColor(SSD1306_WHITE);
-        display->setCursor(0, 0);
+        display->setCursor(cursorX, cursorY);
         display->cp437(true);
         display->print(text);
         display->display();
@@ -253,99 +254,82 @@ class Oled : public Task {
     }
 
     virtual void loop() {
-        // demo();
-    }
-
-    void demo() {
-        int numflakes = 10;
-        int xpos = 0;
-        int ypos = 1;
-        int deltay = 2;
-        int logoWidth = 16;
-        int logoHeight = 16;
-
-        static const unsigned char PROGMEM logo_bmp[] =
-            {0b00000000, 0b11000000,
-             0b00000001, 0b11000000,
-             0b00000001, 0b11000000,
-             0b00000011, 0b11100000,
-             0b11110011, 0b11100000,
-             0b11111110, 0b11111000,
-             0b01111110, 0b11111111,
-             0b00110011, 0b10011111,
-             0b00011111, 0b11111100,
-             0b00001101, 0b01110000,
-             0b00011011, 0b10100000,
-             0b00111111, 0b11100000,
-             0b00111111, 0b11110000,
-             0b01111100, 0b11110000,
-             0b01110000, 0b01110000,
-             0b00000000, 0b00110000};
-
-        int8_t f, icons[numflakes][3];
-
-        // Initialize 'snowflake' positions
-        for (f = 0; f < numflakes; f++) {
-            icons[f][xpos] = random(1 - logoWidth, display->width());
-            icons[f][ypos] = -logoHeight;
-            icons[f][deltay] = random(1, 6);
-            Serial.print(F("x: "));
-            Serial.print(icons[f][xpos], DEC);
-            Serial.print(F(" y: "));
-            Serial.print(icons[f][ypos], DEC);
-            Serial.print(F(" dy: "));
-            Serial.println(icons[f][deltay], DEC);
-        }
-
-        for (;;) {                    // Loop forever...
-            display->clearDisplay();  // Clear the display buffer
-
-            // Draw each snowflake:
-            for (f = 0; f < numflakes; f++) {
-                display->drawBitmap(icons[f][xpos], icons[f][ypos], logo_bmp, logoWidth, logoWidth, logoHeight, SSD1306_WHITE);
-            }
-
-            display->display();  // Show the display buffer on the screen
-            // delay(10);          // Pause for 1/10 second
-
-            // Then update coordinates of each flake...
-            for (f = 0; f < numflakes; f++) {
-                icons[f][ypos] += icons[f][deltay];
-                // If snowflake is off the bottom of the screen...
-                if (icons[f][ypos] >= display->height()) {
-                    // Reinitialize to a random position, just off the top
-                    icons[f][xpos] = random(1 - logoWidth, display->width());
-                    icons[f][ypos] = -logoHeight;
-                    icons[f][deltay] = random(1, 16);
-                }
-            }
-            yield();
-        }
     }
 };
 
-class PotWithOled : public Pot {
+class OledWithPotAndWifi : public Oled {
    public:
-    Oled *oled;
+    Pot *pot;
+    int wifiConnected = 0;
 
-    PotWithOled(Oled *oled,
-                const char *name = "Pot",
-                const int pin = 0,
-                const char *host = "",
-                const char *hostDevice = "") : Pot(name, pin, host, hostDevice) {
-        this->oled = oled;
+    OledWithPotAndWifi(Adafruit_SSD1306 *display, Pot *pot) : Oled(display) {
+        this->pot = pot;
+    }
+
+    void drawWifi(bool state = true) {
+        display->fillRect(0, 0, wifiIconWidth, wifiIconHeight, SSD1306_BLACK);
+        if (state) display->drawBitmap(0, 0, wifiIcon, wifiIconWidth, wifiIconHeight, SSD1306_WHITE);
+        display->display();
     }
 
    protected:
     virtual void loop() {
-        read();
-        char text[32];
-        int percent = map(getValue(), min, max, 1, 100);
-        if (invert) percent = 101 - percent;
-        snprintf(text, sizeof text, "%d%%", percent);
-        oled->write(text);
-        delay(measurementDelay);
+        int potValue = pot->getValue();
+        if (potLastValue != potValue) {
+            char text[5];
+            int percent = pot->invert                                       //
+                              ? map(potValue, pot->max, pot->min, 1, 100)   //
+                              : map(potValue, pot->min, pot->max, 1, 100);  //
+            snprintf(text, sizeof text, "%3d%%", percent);
+            writeText(text, 32);
+            potLastValue = potValue;
+        }
+
+        if (wifiConnected != wifiConnectedLastValue) {
+            drawWifi(0 < wifiConnected);
+            wifiConnectedLastValue = wifiConnected;
+        }
+        delay(pot->measurementDelay);
     }
+
+   private:
+    int potLastValue = 0;
+    int wifiConnectedLastValue = 0;
+    const uint8_t wifiIconWidth = 32;
+    const uint8_t wifiIconHeight = 32;
+    const unsigned char wifiIcon[32 * 32] = {
+        0b00000000, 0b00001110, 0b11110000, 0b00000000,
+        0b00000000, 0b01111110, 0b11111110, 0b00000000,
+        0b00000000, 0b11111110, 0b11111110, 0b10000000,
+        0b00000010, 0b11111110, 0b11111110, 0b11000000,
+        0b00001110, 0b11111100, 0b00111110, 0b11110000,
+        0b00011110, 0b11000000, 0b00000010, 0b11111000,
+        0b00111110, 0b00000000, 0b00000000, 0b11111100,
+        0b01111110, 0b00000000, 0b00000000, 0b01111110,
+        0b01111100, 0b00000110, 0b11100000, 0b00111110,
+        0b11111000, 0b00111110, 0b11111100, 0b00011110,
+        0b01110000, 0b01111110, 0b11111110, 0b00001110,
+        0b00100000, 0b11111110, 0b11111110, 0b10000100,
+        0b00000010, 0b11111100, 0b00111110, 0b11000000,
+        0b00000110, 0b11100000, 0b00000110, 0b11100000,
+        0b00001110, 0b11000000, 0b00000010, 0b11110000,
+        0b00001110, 0b00000000, 0b00000000, 0b11110000,
+        0b00000110, 0b00000110, 0b11100000, 0b01100000,
+        0b00000010, 0b00011110, 0b11111000, 0b01000000,
+        0b00000000, 0b00111110, 0b11111100, 0b00000000,
+        0b00000000, 0b01111110, 0b11111110, 0b00000000,
+        0b00000000, 0b11111110, 0b01111110, 0b00000000,
+        0b00000000, 0b01110000, 0b00001110, 0b00000000,
+        0b00000000, 0b01100000, 0b00000110, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000010, 0b11000000, 0b00000000,
+        0b00000000, 0b00000010, 0b11100000, 0b00000000,
+        0b00000000, 0b00000110, 0b11100000, 0b00000000,
+        0b00000000, 0b00000110, 0b11100000, 0b00000000,
+        0b00000000, 0b00000110, 0b11100000, 0b00000000,
+        0b00000000, 0b00000110, 0b11100000, 0b00000000,
+        0b00000000, 0b00000010, 0b11000000, 0b00000000,
+        0b00000000, 0b00000000, 0b10000000, 0b00000000};
 };
 
 class Switch : public Device {
@@ -417,11 +401,11 @@ class DeviceCommandTask : public Task, public Request {
 
 class PotWithDirectionAndEnableCommandTask : public DeviceCommandTask {
    public:
-    PotWithOled *pot;
+    Pot *pot;
     Switch *direction;
     Switch *enable;
 
-    PotWithDirectionAndEnableCommandTask(PotWithOled *pot, Switch *enable, Switch *direction) : DeviceCommandTask(pot) {
+    PotWithDirectionAndEnableCommandTask(Pot *pot, Switch *enable, Switch *direction) : DeviceCommandTask(pot) {
         this->pot = pot;
         this->enable = enable;
         this->direction = direction;
