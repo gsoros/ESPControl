@@ -25,10 +25,10 @@ Stepper stepper1;
 WiFiManager wifiManager;
 ESP8266WebServer server(API_PORT);
 char configJson[JSON_LENGTH];
-char indexHtml[HTML_LENGTH];
+char uiHtml[HTML_LENGTH];
 
 void handleWebUI() {
-    server.send(200, "text/html", indexHtml);
+    server.send(200, "text/html", uiHtml);
     Serial.println("[HTTP] WebUI");
 }
 
@@ -63,7 +63,10 @@ class ServerTask : public Task {
         server.on("/api/config", handleApiConfig);
         server.onNotFound(handleNotFound);
         server.begin();
-        if (MDNS.begin(config.name, WiFi.localIP(), 1)) {  // TTL is ignored
+        if (MDNS.begin(
+                config.name,
+                WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP(),
+                1)) {  // TTL is ignored
             Serial.println("mDNS responder started");
         } else {
             Serial.println("Error setting up MDNS responder");
@@ -74,32 +77,35 @@ class ServerTask : public Task {
         server.handleClient();
         MDNS.update();
     }
-} server_task;
+} serverTask;
 
 class MonitorTask : public Task {
    protected:
     void loop() {
-        // Serial.printf("IP: %s  enable: %d  direction: %d  speed: %d\n",
-        //     WiFi.localIP().toString().c_str(), stepper_enable, stepper_direction, stepper_speed);
+        IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
+        Serial.printf(
+            "IP: %s  enable: %d  direction: %d  speed: %d\n",
+            ip.toString().c_str(),
+            stepper1.enabled,
+            stepper1.direction,
+            stepper1.speed);
         delay(5000);
     }
-} monitor_task;
+} monitorTask;
 
 void setup() {
     config.name = NAME;                 // server name
-    config.rate = 500;                  // minimum number of milliseconds between commands sent by the client
+    config.rate = 200;                  // minimum number of milliseconds between commands sent by the client
     config.mdnsService = MDNS_SERVICE;  // clients look for this service when discovering
-    config.apiPort = API_PORT;          //
+    config.apiPort = API_PORT;
 
     stepper1.name = "Stepper1";
     stepper1.pin_enable = D1;
     stepper1.pin_direction = D2;
     stepper1.pin_pulse = D3;
-    stepper1.min = 10;    // minimum delay between pulses: fastest speed
-    stepper1.max = 1000;  // maximum delay between pulses: slowest speed
-    stepper1.pulse = 0;   // minimum pulse width
-    stepper1.command_min = -511;
-    stepper1.command_max = 512;
+    stepper1.min = 1;    // (ms) minimum delay between pulses: fastest speed
+    stepper1.max = 200;  // (ms) maximum delay between pulses: slowest speed
+    stepper1.pulse = 0;  // (ms) pulse width
 
     // stepper2.name = "Stepper2";
     // stepper2.pin_enable = D5;
@@ -115,13 +121,13 @@ void setup() {
     // config.addDevice(&stepper2);
 
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_BUILTIN, LOW);
     Serial.begin(115200);
     Serial.println("-------------------------------------------------");
     delay(1000);
 
     // Use wifimanager...
-    // WiFiManagerParameter custom_text("<a href=\"/ui\">ESPControlServer UI</a>");
+    // WiFiManagerParameter custom_text("<br /><a href=\"/ui\">ESPControlServer UI</a>");
     // wifiManager.addParameter(&custom_text);
     // wifiManager.autoConnect(config.name, AP_PASSWORD);
 
@@ -145,7 +151,7 @@ void setup() {
 
     Serial.printf("Processing index.html template: %i\n",
                   snprintf_P(
-                      indexHtml,
+                      uiHtml,
                       HTML_LENGTH,
                       indexHtmlTemplate,
                       WIFI_STA == WiFi.getMode()               //
@@ -153,9 +159,9 @@ void setup() {
                           : WiFi.softAPIP().toString().c_str(),
                       API_PORT));
 
-    Scheduler.start(&server_task);
+    Scheduler.start(&serverTask);
     config.startControlTasks();
-    Scheduler.start(&monitor_task);
+    Scheduler.start(&monitorTask);
     Scheduler.begin();
 }
 

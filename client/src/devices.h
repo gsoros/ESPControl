@@ -4,9 +4,12 @@
 #include <ESP8266HTTPClient.h>
 #include <Scheduler.h>    // https://github.com/nrwiersma/ESP8266Scheduler
 #include <ArduinoJson.h>  // https://github.com/bblanchon/ArduinoJson
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
 #include "request.h"
 
-#define MAX_TASKS 8
 #ifndef JSON_CONF_SIZE
 #define JSON_CONF_SIZE 512
 #endif
@@ -25,6 +28,7 @@ class Device : public Request {
     int commandFailCount = 0;
     int commandFailMax = 5;
     int movementMin = 0;  // minimum difference between value and lastCommand to trigger sendCommand()
+    bool invert = false;
 
     Device() {
         this->name = "";
@@ -193,13 +197,13 @@ class Pot : public Device, public Task {
             commandMax = commandMin;
             commandMin = tmp;
         }
-        if (0 < commandMin) {
-            Serial.printf("[Pot] validateMinMax Warning: 0 < min, zeroing\n");
-            commandMin = 0;
+        if (-1 < commandMin) {
+            Serial.printf("[Pot] validateMinMax Warning: -1 < min\n");
+            commandMin = -1;
         }
-        if (commandMax < 0) {
-            Serial.printf("[Pot] validateMinMax Warning: max < 0, zeroing\n");
-            commandMax = 0;
+        if (commandMax < 1) {
+            Serial.printf("[Pot] validateMinMax Warning: max < 1\n");
+            commandMax = 1;
         }
     }
 
@@ -216,8 +220,6 @@ class Pot : public Device, public Task {
 
 class Switch : public Device {
    public:
-    bool invert;
-
     Switch(
         const char *name = "Switch",
         int pin = 0,
@@ -253,28 +255,33 @@ class Switch : public Device {
 class DeviceCommandTask : public Task, public Request {
    public:
     Device *device;
+    int keepAliveSeconds = 5;  // send command to keep connection alive
 
     DeviceCommandTask(Device *device) {
         this->device = device;
     }
 
    protected:
-    virtual void setup() {
-    }
+    unsigned long lastCommandSent = 0;
 
     virtual void loop() {
         if (!device->hostAvailable) {
             delay(device->hostRate);
             return;
         }
-        int command = device->calculateCommand();
+        int command = calculateCommand();
         int commandDiff = abs(device->lastCommand - command);
-        if (commandDiff > device->movementMin) {
+        if (commandDiff > device->movementMin || lastCommandSent < millis() - keepAliveSeconds * 1000) {
             device->sendCommand(command);
+            lastCommandSent = millis();
         } else if (commandDiff > 0) {
             Serial.printf("[%s] %d movement too small\n", device->name, commandDiff);
         }
         delay(device->hostRate);
+    }
+
+    virtual int calculateCommand() {
+        return device->calculateCommand();
     }
 };
 
@@ -295,21 +302,30 @@ class PotWithDirectionAndEnableCommandTask : public DeviceCommandTask {
         if (enable->getValue() != HIGH)
             out = 0;
         else {
-            int tmpMin;
-            int tmpMax;
-            if (direction->getValue() == HIGH) {
-                tmpMin = 0;
-                tmpMax = pot->commandMin;
+            int inMin;
+            int inMax;
+            if (pot->invert) {
+                inMin = pot->max;
+                inMax = pot->min;
             } else {
-                tmpMin = 0;
-                tmpMax = pot->commandMax;
+                inMin = pot->min;
+                inMax = pot->max;
+            }
+            int outMin;
+            int outMax;
+            if (direction->getValue() == HIGH) {
+                outMin = -1;
+                outMax = pot->commandMin;
+            } else {
+                outMin = 1;
+                outMax = pot->commandMax;
             }
             out = map(
                 pot->getValue(),
-                pot->min,
-                pot->max,
-                tmpMin,
-                tmpMax);
+                inMin,
+                inMax,
+                outMin,
+                outMax);
         }
         Serial.printf(
             "[PotWithDirectionAndEnableCommandTask] calculateCommand: %s %s %i (%i ... %i) => %i (%i ... %i)\n",
@@ -323,21 +339,108 @@ class PotWithDirectionAndEnableCommandTask : public DeviceCommandTask {
             pot->commandMax);
         return out;
     }
+};
+
+class Oled : public Task {
+   public:
+    int sdaPin;
+    int sclPin;
+    int reset = -1;
+    int width = 128;
+    int height = 32;
+    int address = 0x3C;
+    Adafruit_SSD1306 *display;
+
+    Oled(int sdaPin,
+         int sclPin,
+         Adafruit_SSD1306 *display) {
+        this->sdaPin = sdaPin;
+        this->sclPin = sclPin;
+        this->display = display;
+    }
 
    protected:
+    virtual void setup() {
+        Wire.begin(sdaPin, sclPin);
+        // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+        if (!display->begin(SSD1306_SWITCHCAPVCC, address, false, false))
+            Serial.println(F("SSD1306 allocation failed"));
+        display->ssd1306_command(SSD1306_DISPLAYOFF);
+        display->ssd1306_command(SSD1306_DISPLAYON);
+        display->dim(true);
+        display->clearDisplay();
+        display->display();
+    }
+
     virtual void loop() {
-        if (!device->hostAvailable) {
-            delay(device->hostRate);
-            return;
+        testanimate();
+    }
+
+    void testanimate() {
+        int numflakes = 10;
+        int xpos = 0;
+        int ypos = 1;
+        int deltay = 2;
+        int logoWidth = 16;
+        int logoHeight = 16;
+
+        static const unsigned char PROGMEM logo_bmp[] =
+            {0b00000000, 0b11000000,
+             0b00000001, 0b11000000,
+             0b00000001, 0b11000000,
+             0b00000011, 0b11100000,
+             0b11110011, 0b11100000,
+             0b11111110, 0b11111000,
+             0b01111110, 0b11111111,
+             0b00110011, 0b10011111,
+             0b00011111, 0b11111100,
+             0b00001101, 0b01110000,
+             0b00011011, 0b10100000,
+             0b00111111, 0b11100000,
+             0b00111111, 0b11110000,
+             0b01111100, 0b11110000,
+             0b01110000, 0b01110000,
+             0b00000000, 0b00110000};
+
+        int8_t f, icons[numflakes][3];
+
+        // Initialize 'snowflake' positions
+        for (f = 0; f < numflakes; f++) {
+            icons[f][xpos] = random(1 - logoWidth, display->width());
+            icons[f][ypos] = -logoHeight;
+            icons[f][deltay] = random(1, 6);
+            Serial.print(F("x: "));
+            Serial.print(icons[f][xpos], DEC);
+            Serial.print(F(" y: "));
+            Serial.print(icons[f][ypos], DEC);
+            Serial.print(F(" dy: "));
+            Serial.println(icons[f][deltay], DEC);
         }
-        int command = calculateCommand();
-        int commandDiff = abs(device->lastCommand - command);
-        if (commandDiff > device->movementMin) {
-            device->sendCommand(command);
-        } else if (commandDiff > 0) {
-            Serial.printf("[%s] %d movement too small\n", device->name, commandDiff);
+
+        for (;;) {                    // Loop forever...
+            display->clearDisplay();  // Clear the display buffer
+
+            // Draw each snowflake:
+            for (f = 0; f < numflakes; f++) {
+                display->drawBitmap(icons[f][xpos], icons[f][ypos], logo_bmp, logoWidth, logoWidth, logoHeight, SSD1306_WHITE);
+            }
+
+            display->display();  // Show the display buffer on the screen
+            // delay(10);          // Pause for 1/10 second
+
+            // Then update coordinates of each flake...
+            for (f = 0; f < numflakes; f++) {
+                icons[f][ypos] += icons[f][deltay];
+                // If snowflake is off the bottom of the screen...
+                if (icons[f][ypos] >= display->height()) {
+                    // Reinitialize to a random position, just off the top
+                    icons[f][xpos] = random(1 - logoWidth, display->width());
+                    icons[f][ypos] = -logoHeight;
+                    icons[f][deltay] = random(1, 16);
+                }
+            }
+            yield();
         }
-        delay(device->hostRate);
     }
 };
 

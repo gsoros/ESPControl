@@ -9,12 +9,7 @@
 #include "config.h"
 #include "devices.h"
 
-#define NAME "Remote1"
-#define AP_SSID "Controller1"
-#define AP_PASSWORD "espControlServer001"
-#define MDNS_SERVICE "ESPControl"
-
-Config config(NAME, MDNS_SERVICE);
+Config config("Remote1", "Controller1", "espControlServer001", "ESPControl");
 
 Switch enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
@@ -33,6 +28,9 @@ Pot speedPot("Speed", A0, "Controller1", "Stepper1");
 // DeviceCommandTask commandTask(&speedPot);
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
 
+Adafruit_SSD1306 display(128, 32, &Wire, -1);
+Oled oled(D2, D1, &display);
+
 WiFiManager wifiManager;
 
 void setup() {
@@ -44,30 +42,18 @@ void setup() {
     }
     delay(1000);
 
-    // Use wifimanager...
-    // wifiManager.autoConnect(NAME);
-
-    // ... OR connect to an AP
-    Serial.print("[WiFi] Connecting");
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(AP_SSID, AP_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(300);
-        Serial.print(".");
-    }
-    Serial.print(" connected, IP: ");
-    Serial.println(WiFi.localIP());
-
     config.addDevice(&enableSwitch);
     attachInterrupt(digitalPinToInterrupt(enableSwitch.pin), enableSwitchChanged, CHANGE);
 
     config.addDevice(&directionSwitch);
     attachInterrupt(digitalPinToInterrupt(directionSwitch.pin), directionSwitchChanged, CHANGE);
 
+    speedPot.invert = true;
     speedPot.min = 9;
     speedPot.max = 950;
     config.addDevice(&speedPot);
 
+    Scheduler.start(&oled);
     Scheduler.start(&config);
     Scheduler.start(&speedPot);
     Scheduler.start(&commandTask);

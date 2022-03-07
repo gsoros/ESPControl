@@ -9,11 +9,15 @@
 #include "request.h"
 
 #define MAX_DEVICES 32
+#ifndef JSON_CONF_SIZE
 #define JSON_CONF_SIZE 512
+#endif
 
 class Config : public Task, public Request {
    public:
     const char *name;
+    const char *apSSID;
+    const char *apPassword;
     const char *mdnsService;
     const char *mdnsProtocol;
     Device *devices[MAX_DEVICES];
@@ -22,10 +26,14 @@ class Config : public Task, public Request {
 
     Config(
         const char *name = "Remote",
+        const char *apSSID = "",
+        const char *apPassword = "",
         const char *mdnsService = "http",
         const char *mdnsProtocol = "tcp") {
         this->deviceCount = 0;
         this->name = name;
+        this->apSSID = apSSID;
+        this->apPassword = apPassword;
         this->mdnsService = mdnsService;
         this->mdnsProtocol = mdnsProtocol;
     }
@@ -71,6 +79,19 @@ class Config : public Task, public Request {
    protected:
     void setup() {
         Serial.println("Config::setup");
+        // Use wifimanager...
+        // wifiManager.autoConnect(name);
+
+        // ... OR connect to an AP
+        Serial.printf("[WiFi] Connecting to %s\n", "xxx");
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(apSSID, apPassword);
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(300);
+            Serial.print(".");
+        }
+        Serial.print(" connected, IP: ");
+        Serial.println(WiFi.localIP());
     }
 
     void loop() {
