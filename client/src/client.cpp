@@ -11,6 +11,9 @@
 
 Config config("Remote1", "Controller1", "espControlServer001", "ESPControl");
 
+Adafruit_SSD1306 display(128, 32, &Wire, -1);
+Oled oled(&display);
+
 Switch enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
     enableSwitch.read();
@@ -23,13 +26,10 @@ void IRAM_ATTR directionSwitchChanged() {
     Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
 }
 
-Pot speedPot("Speed", A0, "Controller1", "Stepper1");
+PotWithOled speedPot(&oled, "Speed", A0, "Controller1", "Stepper1");
 
 // DeviceCommandTask commandTask(&speedPot);
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
-
-Adafruit_SSD1306 display(128, 32, &Wire, -1);
-Oled oled(D2, D1, &display);
 
 WiFiManager wifiManager;
 
@@ -40,7 +40,8 @@ void setup() {
     for (int x = 0; x < 5; x++) {
         Serial.println("-----------------------------------------");
     }
-    delay(1000);
+
+    Wire.begin(D2, D1);  // oled uses I2C
 
     config.addDevice(&enableSwitch);
     attachInterrupt(digitalPinToInterrupt(enableSwitch.pin), enableSwitchChanged, CHANGE);

@@ -14,7 +14,7 @@
 #define MDNS_SERVICE "ESPControl"
 #define API_PORT 50123  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
 //#define API_PORT 80
-#define JSON_LENGTH 1024
+#define JSON_LENGTH 512
 #define HTML_LENGTH 8192
 
 Config config;
@@ -93,6 +93,7 @@ class MonitorTask : public Task {
             stepper1.setPoint = 0;
         }
 
+        // Log monitor messages to the serial console
         IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
         Serial.printf(
             "[Monitor] IP: %s  enable: %d  direction: %d  speed: %d\n",
@@ -114,7 +115,7 @@ void setup() {
     stepper1.pinEnable = D1;
     stepper1.pinDirection = D2;
     stepper1.pinPulse = D3;
-    stepper1.pulseMin = 2000;   // minimum pause between pulses in microsecs (fastest speed)
+    stepper1.pulseMin = 1500;   // minimum pause between pulses in microsecs (fastest speed)
     stepper1.pulseMax = 15000;  // maximum pause between pulses in microsecs (slowest speed)
     stepper1.pulseWidth = 1;    // pulse width in microsecs
     stepper1.changeMax = 1;     // maximum step of speed change per cycle
