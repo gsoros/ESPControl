@@ -9,7 +9,9 @@
 #include "config.h"
 #include "devices.h"
 
-Config config("Remote1", "Controller1", "Yoh9Ge2goucoo2la", "ESPControl");
+#define AP_PASSWORD "Yoh9Ge2goucoo2la"
+
+Config config("Remote1", "Controller1", AP_PASSWORD, "ESPControl");
 
 Switch enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
