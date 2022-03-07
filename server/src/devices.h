@@ -5,142 +5,182 @@
 #include <ESP8266WebServer.h>
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 
-#define DEVICES_MODE_PRIVATE 0
-#define DEVICES_MODE_PUBLIC 1
+#define JSON_MODE_PRIVATE 0
+#define JSON_MODE_PUBLIC 1
 
 class Device : public Task {
    public:
-    const char *name;
-    const char *type;
-    bool enabled;
+    const char *name = "";
+    const char *type = "";
+    bool enabled = false;
     ESP8266WebServer *server;
 
-    Device() {
-        this->name = "";
-        this->type = "";
-        this->enabled = false;
-        this->server = nullptr;
-    }
-
     virtual void handleApiControl() {
-        this->server->sendHeader("Access-Control-Allow-Origin", "*");
+        server->sendHeader("Access-Control-Allow-Origin", "*");
     };
 
-    virtual JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
+    virtual JSONVar toJSONVar(int mode = JSON_MODE_PRIVATE) {
         JSONVar j;
-        j["name"] = this->name;
-        j["type"] = this->type;
+        j["name"] = name;
+        j["type"] = type;
         return j;
     }
 };
 
 class Stepper : public Device {
    public:
-    int pin_enable;
-    int pin_direction;
-    int pin_pulse;
-    int min;
-    int max;
-    int pulse;
-    int command_min;
-    int command_max;
-    int direction;
-    int speed;
+    int pinEnable;                      // enable pin
+    int pinDirection;                   // direction pin
+    int pinPulse;                       // pulse pin
+    unsigned long pulseMin;             // minimum pause between pulses in microsecs (fastest speed)
+    unsigned long pulseMax;             // maximum pause between pulses in microsecs (slowest speed)
+    unsigned int pulseWidth;            // pulse width in microsecs
+    int commandMin;                     // command minimum, negative for left
+    int commandMax;                     // command maximum
+    int changeMax;                      // maximum step of speed change per cycle
+    int command = 0;                    // command being executed
+    int setPoint = 0;                   // command target
+    unsigned long lastCommandTime = 0;  // time of last command received, can be used for a watchdog
 
     Stepper(
         const char *name = "Stepper",
-        int pin_enable = 0,
-        int pin_direction = 0,
-        int pin_pulse = 0,
-        int min = 0,
-        int max = 1024,
-        int pulse = 0,
-        int command_min = -511,
-        int command_max = 512) {
+        int pinEnable = 0,
+        int pinDirection = 0,
+        int pinPulse = 0,
+        unsigned long pulseMin = 2000,
+        unsigned long pulseMax = 2000000,
+        unsigned int pulseWidth = 1,
+        int commandMin = -511,
+        int commandMax = 512,
+        int changeMax = 10) {
         this->name = name;
-        this->type = "stepper";
-        this->pin_enable = pin_enable;
-        this->pin_direction = pin_direction;
-        this->pin_pulse = pin_pulse;
-        this->min = min;
-        this->max = max;
-        this->pulse = pulse;
-        this->command_min = command_min;
-        this->command_max = command_max;
-        this->direction = 0;
-        this->speed = 0;
+        type = "stepper";
+        this->pinEnable = pinEnable;
+        this->pinDirection = pinDirection;
+        this->pinPulse = pinPulse;
+        this->pulseMin = pulseMin;
+        this->pulseMax = pulseMax;
+        this->pulseWidth = pulseWidth;
+        this->commandMin = commandMin;
+        this->commandMax = commandMax;
+        this->changeMax = changeMax;
     }
 
     void handleApiControl() {
+        // Serial.printf("[Stepper %s] handleApiControl\n", name);
         Device::handleApiControl();
-        int command = this->server->arg("command").toInt();
-        // Serial.printf("Received command: %i\n", command);
-        if (command < this->command_min) {
-            command = this->command_min;
-        } else if (command > this->command_max) {
-            command = this->command_max;
+        if (!server->hasArg("command")) {
+            server->send(400, "text/plain", "missing command");
+            return;
         }
-        this->direction = command < 0 ? -1 : 1;
-        this->speed = abs(command);
-        this->enabled = this->speed > 0;
+        int command = server->arg("command").toInt();
+        // Serial.printf("Received command: %i\n", command);
+        if (command < commandMin)
+            command = commandMin;
+        else if (command > commandMax)
+            command = commandMax;
+        this->setPoint = command;
         char message[100];
         sprintf(message, "[%s] command enable: %d  direction: %d  speed: %d",
-                this->name, this->enabled, this->direction, this->speed);
-        this->server->send(200, "text/plain", message);
-        Serial.println(message);
+                name, command == 0 ? 0 : 1, command > 0 ? 1 : 0, abs(command));
+        server->send(200, "text/plain", message);
+        lastCommandTime = millis();
     }
 
-    JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
+    JSONVar toJSONVar(int mode = JSON_MODE_PRIVATE) {
+        Serial.printf("[Stepper %s] toJSONVar\n", name);
         JSONVar j = Device::toJSONVar(mode);
-        j["command_min"] = this->command_min;
-        j["command_max"] = this->command_max;
-        if (DEVICES_MODE_PRIVATE == mode) {
-            j["pin_enable"] = this->pin_enable;
-            j["pin_direction"] = this->pin_direction;
-            j["pin_pulse"] = this->pin_pulse;
-            j["min"] = this->min;
-            j["max"] = this->max;
-            j["pulse"] = this->pulse;
+        j["commandMin"] = commandMin;
+        j["commandMax"] = commandMax;
+        if (JSON_MODE_PRIVATE == mode) {
+            j["pinEnable"] = pinEnable;
+            j["pinDirection"] = pinDirection;
+            j["pinPulse"] = pinPulse;
+            j["pulseMin"] = (long)pulseMin;
+            j["pulseMax"] = (long)pulseMax;
+            j["pulseWidth"] = (int)pulseWidth;
         }
         return j;
     }
 
    protected:
     void setup() {
-        pinMode(this->pin_enable, OUTPUT);
-        pinMode(this->pin_direction, OUTPUT);
-        pinMode(this->pin_pulse, OUTPUT);
-        digitalWrite(this->pin_enable, LOW);
-        digitalWrite(this->pin_direction, HIGH);
-        digitalWrite(this->pin_pulse, LOW);
+        Serial.printf("[Stepper %s] setup\n", name);
+        pinMode(pinEnable, OUTPUT);
+        pinMode(pinDirection, OUTPUT);
+        pinMode(pinPulse, OUTPUT);
+        digitalWrite(pinEnable, LOW);
+        digitalWrite(pinDirection, HIGH);
+        digitalWrite(pinPulse, LOW);
     }
 
     void loop() {
-        // Serial.print("--StLoo--");
-        int speed = this->speed;
-        int pause = this->calculatePause();
-        while (this->enabled && (0 < this->speed)) {
-            digitalWrite(this->pin_direction, (0 < this->direction) ? LOW : HIGH);
-            digitalWrite(this->pin_enable, HIGH);
-            digitalWrite(this->pin_pulse, HIGH);
-            if (0 < this->pulse) delay(this->pulse);
-            digitalWrite(this->pin_pulse, LOW);
-            if (speed != this->speed) {
-                speed = this->speed;
-                pause = this->calculatePause();
-            }
-            delay(pause);
+        easeCommandToSetPoint();
+        int command = this->command;
+        unsigned long pause = calculatePause();
+        if (0 != this->command) {
+            digitalWrite(pinEnable, HIGH);
+            digitalWrite(pinDirection, 0 < command ? LOW : HIGH);
         }
-        digitalWrite(this->pin_enable, LOW);
+        while (0 != this->command) {
+            easeCommandToSetPoint();
+            digitalWrite(pinPulse, HIGH);
+            microDelay(pulseWidth);
+            digitalWrite(pinPulse, LOW);
+            if (command != this->command) {
+                digitalWrite(pinDirection, 0 < command ? LOW : HIGH);
+                command = this->command;
+                pause = calculatePause();
+            }
+            microDelay(pause);
+        }
+        digitalWrite(pinEnable, LOW);
     }
 
-    int calculatePause() {
-        return map(
-            this->speed,
-            this->command_min,
-            this->command_max,
-            this->max * 2,
-            this->min);
+    void easeCommandToSetPoint() {
+        if (command == setPoint) return;
+        if (command < setPoint) {
+            command += changeMax;
+            if (setPoint < command)  // overshoot
+                command = setPoint;
+        } else {  // setPoint < command
+            command -= changeMax;
+            if (command < setPoint)  // overshoot
+                command = setPoint;
+        }
+        if (0 == command && 0 != setPoint)  // avoid 0 as it stops the control loop
+            command = 0 < setPoint ? 1 : -1;
+    }
+
+    unsigned long calculatePause() {
+        if (0 == command) {
+            return 0;
+        }
+        int min, max;
+        if (command < 0) {
+            min = commandMax < 0 ? abs(commandMax) : 0;
+            max = abs(commandMin);
+        } else {  // 0 < command
+            min = 0 < commandMin ? commandMin : 0;
+            max = commandMax;
+        }
+        unsigned long pause = map(
+            abs(command),
+            min,
+            max,
+            pulseMax,
+            pulseMin);
+        // Serial.printf(
+        //    "[Stepper %s] calculatePause command: %d (%d ... %d) => pause: %ld (%ld ... %ld)\n",
+        //    name, command, min, max, pause, pulseMin, pulseMax);
+        return pause;
+    }
+
+    void microDelay(unsigned long us) {
+        if (0 == us) return;
+        unsigned long end = micros() + us;
+        while (micros() < end)
+            yield();
     }
 };
 
@@ -151,7 +191,7 @@ class Led : public Device {
 
     Led(const char *name = "Led", int pin_enable = 0, bool invert = false) {
         this->name = name;
-        this->type = "led";
+        type = "led";
         this->pin_enable = pin_enable;
         this->invert = invert;
     }
@@ -160,41 +200,38 @@ class Led : public Device {
         Device::handleApiControl();
         bool enabled = false;
         // Serial.printf("[%s] enable: %s %li\n",
-        //     this->name,
-        //     this->server->arg("enable").c_str(),
-        //     this->server->arg("enable").toInt());
+        //     name,
+        //     server->arg("enable").c_str(),
+        //     server->arg("enable").toInt());
         if (
-            ('t' == this->server->arg("enable").c_str()[0]) ||  // "true"
-            (0 < this->server->arg("enable").toInt()))          // 1
+            ('t' == server->arg("enable").c_str()[0]) ||  // "true"
+            (0 < server->arg("enable").toInt()))          // 1
             enabled = true;
 
         this->enabled = enabled;
         char message[100];
-        sprintf(message, "[%s] command enable: %s", this->name,
-                this->enabled ? "true" : "false");
-        this->server->send(200, "text/plain", message);
+        sprintf(message, "[%s] command enable: %s", name,
+                enabled ? "true" : "false");
+        server->send(200, "text/plain", message);
         Serial.println(message);
     }
 
-    JSONVar toJSONVar(int mode = DEVICES_MODE_PRIVATE) {
+    JSONVar toJSONVar(int mode = JSON_MODE_PRIVATE) {
         JSONVar j = Device::toJSONVar(mode);
-        if (DEVICES_MODE_PRIVATE == mode) {
-            j["pin_enable"] = this->pin_enable;
+        if (JSON_MODE_PRIVATE == mode) {
+            j["pin_enable"] = pin_enable;
         }
         return j;
     }
 
    protected:
     void setup() {
-        pinMode(this->pin_enable, OUTPUT);
-        this->loop();
+        pinMode(pin_enable, OUTPUT);
     }
 
     void loop() {
-        digitalWrite(
-            this->pin_enable,
-            this->invert ? !this->enabled : this->enabled ? HIGH
-                                                          : LOW);
+        digitalWrite(pin_enable, invert ? !enabled : enabled ? HIGH
+                                                             : LOW);
     }
 };
 

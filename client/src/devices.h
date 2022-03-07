@@ -175,10 +175,10 @@ class Pot : public Device, public Task {
                     Serial.printf("Checking device %i to match %s\n", i, this->hostDevice);
                     if (conf["devices"][i]["name"] == this->hostDevice) {
                         Serial.printf("[Pot %s] Host device found\n", this->name);
-                        if (conf["devices"][i]["command_min"].is<int>())
-                            this->commandMin = conf["devices"][i]["command_min"];
-                        if (conf["devices"][i]["command_max"].is<int>())
-                            this->commandMax = conf["devices"][i]["command_max"];
+                        if (conf["devices"][i]["commandMin"].is<int>())
+                            this->commandMin = conf["devices"][i]["commandMin"];
+                        if (conf["devices"][i]["commandMax"].is<int>())
+                            this->commandMax = conf["devices"][i]["commandMax"];
                         validateMinMax();
                         Serial.printf("[Pot %s] Host device command min: %i, max: %i\n",
                                       this->name, this->commandMin, this->commandMax);
@@ -327,6 +327,7 @@ class PotWithDirectionAndEnableCommandTask : public DeviceCommandTask {
                 outMin,
                 outMax);
         }
+        /*
         Serial.printf(
             "[PotWithDirectionAndEnableCommandTask] calculateCommand: %s %s %i (%i ... %i) => %i (%i ... %i)\n",
             enable->getValue() == HIGH ? "Enable" : "Disable",
@@ -337,6 +338,7 @@ class PotWithDirectionAndEnableCommandTask : public DeviceCommandTask {
             out,
             pot->commandMin,
             pot->commandMax);
+        */
         return out;
     }
 };

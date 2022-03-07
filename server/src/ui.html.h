@@ -39,7 +39,7 @@ const char indexHtmlTemplate[] PROGMEM = R"====(
                                 types[device.name] = device.type;
                                 switch (device.type) {
                                     case "stepper":
-                                        addStepper(device.name, device.command_min, device.command_max);
+                                        addStepper(device.name, device.commandMin, device.commandMax);
                                         break;
                                     case "led":
                                         addLed(device.name);

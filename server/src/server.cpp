@@ -33,7 +33,7 @@ void handleWebUI() {
 }
 
 void handleApiControl() {
-    // Serial.println("server.handleApiControl()");
+    // Serial.println("[HTTP] handleApiControl()");
     config.handleApiControl();
 }
 
@@ -57,7 +57,7 @@ class ServerTask : public Task {
    protected:
     void setup() {
         config.setServer(&server);
-        strncpy(configJson, config.toJsonString(CONFIG_MODE_PUBLIC).c_str(), JSON_LENGTH);
+        strncpy(configJson, config.toJsonString(JSON_MODE_PUBLIC).c_str(), JSON_LENGTH);
         server.on("/ui", handleWebUI);
         server.on("/api/control", handleApiControl);
         server.on("/api/config", handleApiConfig);
@@ -82,13 +82,24 @@ class ServerTask : public Task {
 class MonitorTask : public Task {
    protected:
     void loop() {
+        // Watchdog: stop stepper 15 seconds after the last command received
+        unsigned long timeout = 15000;
+        unsigned long t = millis();
+        if (0 < stepper1.lastCommandTime &&
+            timeout < t &&
+            stepper1.lastCommandTime < t - timeout &&
+            stepper1.setPoint != 0) {
+            Serial.printf("[Watchdog] Remote timed out, stopping the stepper\n");
+            stepper1.setPoint = 0;
+        }
+
         IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
         Serial.printf(
-            "IP: %s  enable: %d  direction: %d  speed: %d\n",
+            "[Monitor] IP: %s  enable: %d  direction: %d  speed: %d\n",
             ip.toString().c_str(),
-            stepper1.enabled,
-            stepper1.direction,
-            stepper1.speed);
+            stepper1.command == 0 ? 0 : 1,
+            stepper1.command > 0 ? 1 : 0,
+            abs(stepper1.command));
         delay(5000);
     }
 } monitorTask;
@@ -100,25 +111,17 @@ void setup() {
     config.apiPort = API_PORT;
 
     stepper1.name = "Stepper1";
-    stepper1.pin_enable = D1;
-    stepper1.pin_direction = D2;
-    stepper1.pin_pulse = D3;
-    stepper1.min = 1;    // (ms) minimum delay between pulses: fastest speed
-    stepper1.max = 200;  // (ms) maximum delay between pulses: slowest speed
-    stepper1.pulse = 0;  // (ms) pulse width
-
-    // stepper2.name = "Stepper2";
-    // stepper2.pin_enable = D5;
-    // stepper2.pin_direction = D6;
-    // stepper2.pin_pulse = D7;
-
-    // led1.name = "Led1";
-    // led1.pin_enable = D4;
-    // led1.invert = true;
+    stepper1.pinEnable = D1;
+    stepper1.pinDirection = D2;
+    stepper1.pinPulse = D3;
+    stepper1.pulseMin = 2000;   // minimum pause between pulses in microsecs (fastest speed)
+    stepper1.pulseMax = 15000;  // maximum pause between pulses in microsecs (slowest speed)
+    stepper1.pulseWidth = 1;    // pulse width in microsecs
+    stepper1.changeMax = 1;     // maximum step of speed change per cycle
+    stepper1.commandMin = -1024;
+    stepper1.commandMax = 1024;
 
     config.addDevice(&stepper1);
-    // config.addDevice(&led1);
-    // config.addDevice(&stepper2);
 
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
@@ -149,7 +152,7 @@ void setup() {
     // Serial.print(" connected, IP: ");
     // Serial.println(WiFi.localIP());
 
-    Serial.printf("Processing index.html template: %i\n",
+    Serial.printf("[Setup] Processing index.html template: %i\n",
                   snprintf_P(
                       uiHtml,
                       HTML_LENGTH,
