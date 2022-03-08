@@ -36,8 +36,6 @@ void IRAM_ATTR enableSwitchChanged() {
 
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
 
-// WiFiManager wifiManager;
-
 WiFiEventHandler connectedHandler;
 WiFiEventHandler disconnectedHandler;
 WiFiEventHandler softAPStationConnectedHandler;
