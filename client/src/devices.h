@@ -14,6 +14,8 @@
 #define JSON_CONF_SIZE 512
 #endif
 
+class OledWithPotAndWifi;
+
 class Device : public Request {
    public:
     const char *name;
@@ -29,6 +31,7 @@ class Device : public Request {
     int commandFailMax = 5;
     int movementMin = 0;  // minimum difference between value and lastCommand to trigger sendCommand()
     bool invert = false;
+    OledWithPotAndWifi *oled;
 
     Device() {
         this->name = "";
@@ -40,32 +43,12 @@ class Device : public Request {
         read();
     }
 
-    bool sendCommand(int command) {
-        if (!hostAvailable) return false;
-        Serial.printf("[Device %s] Sending command: %d\n", name, command);
-        char url[100];
-        sprintf(url, "http://%s:%i/api/control?device=%s&command=%i",
-                hostIp.toString().c_str(),
-                hostPort,
-                hostDevice,
-                command);
-        char response[this->responseBufSize];
-        int statusCode = this->requestGet(url, response);
-        if (statusCode == HTTP_CODE_OK) {
-            lastCommand = command;
-            commandFailCount = 0;
-            return true;
-        }
-        commandFailCount++;
-        Serial.printf("[%s] Command reply HTTP code %i, streak %i\n",
-                      name,
-                      statusCode,
-                      commandFailCount);
-        if (commandFailCount >= commandFailMax) {
-            hostAvailable = false;
-            commandFailCount = 0;
-        }
-        return false;
+    void blinkOledWifi(int speed);
+
+    bool sendCommand(int command);
+
+    void setOled(OledWithPotAndWifi *oled) {
+        this->oled = oled;
     }
 
     virtual int calculateCommand() {
@@ -261,35 +244,63 @@ class OledWithPotAndWifi : public Oled {
    public:
     Pot *pot;
     int wifiConnected = 0;
-    int wifiBlinkSpeed = 0;  // blinks/s
+    int wifiBlinkSpeed = 0;     // blinks/s
+    int percentBlinkSpeed = 0;  // blinks/s
 
     OledWithPotAndWifi(Adafruit_SSD1306 *display, Pot *pot) : Oled(display) {
         this->pot = pot;
+        pot->setOled(this);
     }
 
-    void drawWifi(bool state = true) {
-        display->fillRect(0, 0, wifiIconWidth, wifiIconHeight, SSD1306_BLACK);
-        if (state) display->drawBitmap(0, 0, wifiIcon, wifiIconWidth, wifiIconHeight, SSD1306_WHITE);
+    void drawWifi(bool visible = true) {
+        if (visible)
+            display->drawBitmap(0, 0, wifiIcon, wifiIconWidth, wifiIconHeight, SSD1306_WHITE);
+        else
+            display->fillRect(0, 0, wifiIconWidth, wifiIconHeight, SSD1306_BLACK);
         display->display();
     }
 
+    void writePercent(uint8_t percent, bool visible = true) {
+        if (percent < 0 || 100 < percent) {
+            Serial.printf("Percent out ouf range: %d\n", percent);
+            return;
+        }
+        if (visible) {
+            char text[5];
+            snprintf(text, 5, "%3d%%", percent);
+            writeText(text, 32);
+            return;
+        }
+        writeText("", 32);
+    }
+
    protected:
+    virtual void setup() {
+        Oled::setup();
+        potLastValue = pot->getValue() + 1;  // make sure value gets displayed on oled
+    }
+
     virtual void loop() {
         int potValue = pot->getValue();
-        if (potLastValue != potValue) {
-            char text[5];
-            int percent = pot->invert                                       //
-                              ? map(potValue, pot->max, pot->min, 1, 100)   //
-                              : map(potValue, pot->min, pot->max, 1, 100);  //
-            snprintf(text, sizeof text, "%3d%%", percent);
-            writeText(text, 32);
+        if (potValue != potLastValue) {
+            potPercent = pot->invert                                       //
+                             ? map(potValue, pot->max, pot->min, 1, 100)   //
+                             : map(potValue, pot->min, pot->max, 1, 100);  //
+            writePercent(potPercent);
             potLastValue = potValue;
+        }
+        if (0 < percentBlinkSpeed &&
+            percentVisibleLastChange < millis() - 1000 / percentBlinkSpeed) {
+            percentVisible = !percentVisible;
+            writePercent(potPercent, percentVisible);
+            percentVisibleLastChange = millis();
         }
 
         if (0 < wifiBlinkSpeed) {
             if (wifiIconLastChange < millis() - 1000 / wifiBlinkSpeed) {
                 wifiIconVisible = !wifiIconVisible;
                 drawWifi(wifiIconVisible);
+                wifiIconLastChange = millis();
             }
         } else if (wifiConnected != wifiConnectedLastValue) {
             drawWifi(0 < wifiConnected);
@@ -300,9 +311,12 @@ class OledWithPotAndWifi : public Oled {
 
    private:
     int potLastValue = 0;
+    uint8_t potPercent = 0;
     int wifiConnectedLastValue = 0;
     bool wifiIconVisible = false;
     unsigned long wifiIconLastChange = 0;
+    bool percentVisible = false;
+    unsigned long percentVisibleLastChange = 0;
     const uint8_t wifiIconWidth = 32;
     const uint8_t wifiIconHeight = 32;
     const unsigned char wifiIcon[32 * 32] = {
@@ -339,6 +353,46 @@ class OledWithPotAndWifi : public Oled {
         0b00000000, 0b00000010, 0b11000000, 0b00000000,
         0b00000000, 0b00000000, 0b10000000, 0b00000000};
 };
+
+void Device::blinkOledWifi(int speed) {
+    if (nullptr == oled) return;
+    oled->wifiBlinkSpeed = speed;
+}
+
+void Device::blinkOledPercent(int speed) {
+    if (nullptr == oled) return;
+    oled->percentBlinkSpeed = speed;
+}
+
+bool Device::sendCommand(int command) {
+    if (!hostAvailable) return false;
+    Serial.printf("[Device %s] Sending command: %d\n", name, command);
+    char url[100];
+    sprintf(url, "http://%s:%i/api/control?device=%s&command=%i",
+            hostIp.toString().c_str(),
+            hostPort,
+            hostDevice,
+            command);
+    char response[this->responseBufSize];
+    blinkOledWifi(10);
+    int statusCode = this->requestGet(url, response);
+    blinkOledWifi(0);
+    if (statusCode == HTTP_CODE_OK) {
+        lastCommand = command;
+        commandFailCount = 0;
+        return true;
+    }
+    commandFailCount++;
+    Serial.printf("[%s] Command reply HTTP code %i, streak %i\n",
+                  name,
+                  statusCode,
+                  commandFailCount);
+    if (commandFailCount >= commandFailMax) {
+        hostAvailable = false;
+        commandFailCount = 0;
+    }
+    return false;
+}
 
 class Switch : public Device {
    public:
