@@ -133,12 +133,13 @@ class Stepper : public Device {
             digitalWrite(pinPulse, HIGH);
             microDelay(pulseWidth);
             digitalWrite(pinPulse, LOW);
+            pulseEndTime = micros64();
             if (command != this->command) {
                 digitalWrite(pinDirection, 0 < command ? LOW : HIGH);
                 command = this->command;
                 pause = calculatePause();
             }
-            microDelay(pause);
+            microDelay(pause - (micros64() - pulseEndTime));
         }
         digitalWrite(pinEnable, LOW);
     }
@@ -186,6 +187,9 @@ class Stepper : public Device {
         while (micros() < end)
             yield();
     }
+
+   private:
+    uint64_t pulseEndTime = 0;
 };
 
 class Led : public Device {

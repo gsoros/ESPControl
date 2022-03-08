@@ -378,14 +378,13 @@ class DeviceCommandTask : public Task, public Request {
    public:
     Device *device;
     int keepAliveSeconds = 5;  // send command to keep connection alive
+    unsigned long lastCommandSent = 0;
 
     DeviceCommandTask(Device *device) {
         this->device = device;
     }
 
    protected:
-    unsigned long lastCommandSent = 0;
-
     virtual void loop() {
         if (!device->hostAvailable) {
             delay(device->hostRate);
@@ -393,9 +392,12 @@ class DeviceCommandTask : public Task, public Request {
         }
         int command = calculateCommand();
         int commandDiff = abs(device->lastCommand - command);
-        if (commandDiff > device->movementMin || lastCommandSent < millis() - keepAliveSeconds * 1000) {
-            device->sendCommand(command);
-            lastCommandSent = millis();
+        long cutoff = millis() - keepAliveSeconds * 1000;
+        if (commandDiff > device->movementMin                           //
+            || (lastCommandSent < (unsigned long)cutoff && 0 < cutoff)  //
+            || 0 == lastCommandSent) {
+            if (device->sendCommand(command))
+                lastCommandSent = millis();
         } else if (commandDiff > 0) {
             Serial.printf("[%s] %d movement too small\n", device->name, commandDiff);
         }

@@ -46,6 +46,7 @@ WiFiEventHandler softAPStationDisconnectedHandler;
 void onConnected(const WiFiEventStationModeConnected& evt) {
     Serial.println("WiFi connected");
     oled.wifiConnected = 1;
+    commandTask.lastCommandSent = 0;
 }
 void onDisconnected(const WiFiEventStationModeDisconnected& evt) {
     Serial.println("WiFi disconnected");
@@ -54,6 +55,7 @@ void onDisconnected(const WiFiEventStationModeDisconnected& evt) {
 void onStationConnected(const WiFiEventSoftAPModeStationConnected& evt) {
     Serial.println("Station connected");
     oled.wifiConnected++;
+    commandTask.lastCommandSent = 0;
 }
 void onStationDisconnected(const WiFiEventSoftAPModeStationDisconnected& evt) {
     Serial.println("Station disconnected");
@@ -82,6 +84,8 @@ void setup() {
     speedPot.min = 9;
     speedPot.max = 950;
     config.addDevice(&speedPot);
+
+    commandTask.keepAliveSeconds = 1800;  // 30min
 
     config.setOled(&oled);
 

@@ -100,8 +100,8 @@ class ServerTask : public Task {
 class MonitorTask : public Task {
    protected:
     void loop() {
-        // Watchdog: stop stepper 15 seconds after the last command received
-        unsigned long t = millis();
+        // Watchdog: stop stepper [wdTimeout] seconds after the last command received
+        unsigned int t = millis() / 1000;
         if (0 < stepper1.lastCommandTime &&
             wdTimeout < t &&
             stepper1.lastCommandTime < t - wdTimeout &&
@@ -123,7 +123,7 @@ class MonitorTask : public Task {
     }
 
    private:
-    const unsigned long wdTimeout = 15000;
+    const unsigned int wdTimeout = 3600;  // 1h
 } monitorTask;
 
 void setup() {
