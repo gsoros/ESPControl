@@ -1,9 +1,8 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <ESP8266WebServer.h>
-#include <Scheduler.h>    // https://github.com/nrwiersma/ESP8266Scheduler
-#include <WiFiManager.h>  // https://github.com/tzapu/WiFiManager
+#include <ESPAsyncWebServer.h>
+#include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
 #include "ui.html.h"
@@ -21,35 +20,38 @@
 Config config;
 Stepper stepper1;
 
-WiFiManager wifiManager;
-ESP8266WebServer server(API_PORT);
+AsyncWebServer server(API_PORT);
 char configJson[JSON_LENGTH];
 char uiHtml[HTML_LENGTH];
 
-void handleWebUI() {
-    server.send(200, "text/html", uiHtml);
+void handleWebUI(AsyncWebServerRequest* request) {
+    Serial.println("[HTTP] handleWebUI()");
+    request->send(200, "text/html", uiHtml);
     Serial.println("[HTTP] WebUI");
 }
 
-void handleApiControl() {
+void handleApiControl(AsyncWebServerRequest* request) {
     // Serial.println("[HTTP] handleApiControl()");
-    config.handleApiControl();
+    Serial.flush();
+    config.handleApiControl(request);
 }
 
-void handleApiConfig() {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "application/json", configJson);
-    Serial.println("[HTTP] config");
+void handleApiConfig(AsyncWebServerRequest* request) {
+    // Serial.println("[HTTP] handleApiConfig()");
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/json", configJson);
+    response->addHeader("Access-Control-Allow-Origin", "*");
+    request->send(response);
 }
 
-void handleNotFound() {
-    Serial.printf("[HTTP] not found: %s\n", server.uri().c_str());
-    if (0 == strcmp("/favicon.ico", server.uri().c_str())) {
-        server.send(404, "text/plain", "404 Not found");
+void handleNotFound(AsyncWebServerRequest* request) {
+    Serial.printf("[HTTP] not found: %s\n", request->url().c_str());
+    if (0 == strcmp("/favicon.ico", request->url().c_str())) {
+        request->send(404, "text/plain", "404 Not found");
         return;
     }
-    server.sendHeader("Location", "/ui", true);
-    server.send(302, "text/plain", "302 Moved");
+    AsyncWebServerResponse* response = request->beginResponse(302, "text/plain", "Moved");
+    response->addHeader("Location", "/ui");
+    request->send(response);
 }
 
 WiFiEventHandler connectedHandler;
@@ -91,7 +93,6 @@ class ServerTask : public Task {
         MDNS.addService(config.mdnsService, config.mdnsProtocol, config.apiPort);
     }
     void loop() {
-        server.handleClient();
         MDNS.update();
     }
 } serverTask;
@@ -153,12 +154,7 @@ void setup() {
     softAPStationConnectedHandler = WiFi.onSoftAPModeStationConnected(&onStationConnected);
     softAPStationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(&onStationDisconnected);
 
-    // Use wifimanager...
-    // WiFiManagerParameter custom_text("<br /><a href=\"/ui\">ESPControlServer UI</a>");
-    // wifiManager.addParameter(&custom_text);
-    // wifiManager.autoConnect(config.name, AP_PASSWORD);
-
-    // ... OR create an AP ...
+    // ... create an AP ...
     Serial.print("[WiFi AP] Setting up acces point");
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, AP_PASSWORD);

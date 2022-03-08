@@ -3,7 +3,7 @@
 
 #include <Arduino_JSON.h>
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
-#include <ESP8266WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include "devices.h"
 
 #define MAX_DEVICES 32
@@ -19,7 +19,7 @@ class Config {
     int apiPort;
     Device *devices[MAX_DEVICES];
     int deviceCount = 0;
-    ESP8266WebServer *server;
+    AsyncWebServer *server;  // TODO not used
 
     Config(
         const char *name = "Controller",
@@ -34,7 +34,7 @@ class Config {
         this->apiPort = apiPort;
     }
 
-    void setServer(ESP8266WebServer *server) {
+    void setServer(AsyncWebServer *server) {
         this->server = server;
         for (int i = 0; i < deviceCount; i++) {
             devices[i]->server = server;
@@ -80,20 +80,21 @@ class Config {
         return nullptr;
     }
 
-    void handleApiControl() {
-        if (nullptr == server) {
-            Serial.println("[Config] handleApiControl: error: server is null");
+    void handleApiControl(AsyncWebServerRequest *request) {
+        // Serial.println("[Config] handleApiControl()");
+        if (nullptr == request) {
+            Serial.println("[Config] handleApiControl: error: request is null");
             return;
         }
-        const char *deviceName = server->arg("device").c_str();
+        const char *deviceName = request->arg("device").c_str();
         // Serial.printf("[Config] Received control request for %s\n", deviceName);
         Device *device = this->device(deviceName);
         if (nullptr == device) {
             Serial.printf("[Config] Control request received for non-existent device \"%s\"\n", deviceName);
-            server->send(500, "text/plain", "Device does not exist");
+            request->send(500, "text/plain", "Device does not exist");
             return;
         }
-        device->handleApiControl();
+        device->handleApiControl(request);
     }
 
     void startControlTasks() {

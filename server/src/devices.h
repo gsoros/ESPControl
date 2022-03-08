@@ -2,7 +2,7 @@
 #define DEVICES_H
 
 #include <Arduino_JSON.h>
-#include <ESP8266WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 
 #define JSON_MODE_PRIVATE 0
@@ -13,10 +13,12 @@ class Device : public Task {
     const char *name = "";
     const char *type = "";
     bool enabled = false;
-    ESP8266WebServer *server;
+    AsyncWebServer *server;
 
-    virtual void handleApiControl() {
-        server->sendHeader("Access-Control-Allow-Origin", "*");
+    virtual void handleApiControl(AsyncWebServerRequest *request, AsyncWebServerResponse *response = nullptr) {
+        // Serial.printf("[Device %s] handleApiControl()\n", name);
+        if (nullptr != response)
+            response->addHeader("Access-Control-Allow-Origin", "*");
     };
 
     virtual JSONVar toJSONVar(int mode = JSON_MODE_PRIVATE) {
@@ -66,24 +68,29 @@ class Stepper : public Device {
         this->changeMax = changeMax;
     }
 
-    void handleApiControl() {
-        // Serial.printf("[Stepper %s] handleApiControl\n", name);
-        Device::handleApiControl();
-        if (!server->hasArg("command")) {
-            server->send(400, "text/plain", "missing command");
+    void handleApiControl(AsyncWebServerRequest *request, AsyncWebServerResponse *response = nullptr) {
+        // Serial.printf("[Stepper %s] handleApiControl()\n", name);
+        if (!request->hasArg("command")) {
+            request->send(400, "text/plain", "missing command");
             return;
         }
-        int command = server->arg("command").toInt();
+        int command = request->arg("command").toInt();
         if (command < commandMin)
             command = commandMin;
         else if (command > commandMax)
             command = commandMax;
         this->setPoint = command;
+        lastCommandTime = millis();
         char message[100];
         sprintf(message, "[%s] command enable: %d  direction: %d  speed: %d",
                 name, command == 0 ? 0 : 1, command > 0 ? 1 : 0, abs(command));
-        server->send(200, "text/plain", message);
-        lastCommandTime = millis();
+        if (nullptr == response) {
+            // Serial.printf("[Stepper %s] handleApiControl() creating response\n", name);
+            response = request->beginResponse(200, "text/plain", message);
+        }
+        Device::handleApiControl(request, response);
+        // Serial.printf("[Stepper %s] handleApiControl() success, sending response\n", name);
+        request->send(response);
     }
 
     JSONVar toJSONVar(int mode = JSON_MODE_PRIVATE) {
@@ -193,23 +200,19 @@ class Led : public Device {
         this->invert = invert;
     }
 
-    void handleApiControl() {
-        Device::handleApiControl();
+    void handleApiControl(AsyncWebServerRequest *request, AsyncWebServerResponse *response = nullptr) {
+        Device::handleApiControl(request, response);
         bool enabled = false;
-        // Serial.printf("[%s] enable: %s %li\n",
-        //     name,
-        //     server->arg("enable").c_str(),
-        //     server->arg("enable").toInt());
         if (
-            ('t' == server->arg("enable").c_str()[0]) ||  // "true"
-            (0 < server->arg("enable").toInt()))          // 1
+            ('t' == request->arg("enable").c_str()[0]) ||  // "true"
+            (0 < request->arg("enable").toInt()))          // 1
             enabled = true;
 
         this->enabled = enabled;
         char message[100];
         sprintf(message, "[%s] command enable: %s", name,
                 enabled ? "true" : "false");
-        server->send(200, "text/plain", message);
+        request->send(200, "text/plain", message);
         Serial.println(message);
     }
 
