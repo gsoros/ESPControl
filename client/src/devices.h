@@ -43,8 +43,8 @@ class Device : public Request {
         read();
     }
 
+    void blinkOledPercent(int speed);
     void blinkOledWifi(int speed);
-
     bool sendCommand(int command);
 
     void setOled(OledWithPotAndWifi *oled) {
@@ -246,6 +246,7 @@ class OledWithPotAndWifi : public Oled {
     int wifiConnected = 0;
     int wifiBlinkSpeed = 0;     // blinks/s
     int percentBlinkSpeed = 0;  // blinks/s
+    int potLastValue = 0;
 
     OledWithPotAndWifi(Adafruit_SSD1306 *display, Pot *pot) : Oled(display) {
         this->pot = pot;
@@ -275,42 +276,6 @@ class OledWithPotAndWifi : public Oled {
     }
 
    protected:
-    virtual void setup() {
-        Oled::setup();
-        potLastValue = pot->getValue() + 1;  // make sure value gets displayed on oled
-    }
-
-    virtual void loop() {
-        int potValue = pot->getValue();
-        if (potValue != potLastValue) {
-            potPercent = pot->invert                                       //
-                             ? map(potValue, pot->max, pot->min, 1, 100)   //
-                             : map(potValue, pot->min, pot->max, 1, 100);  //
-            writePercent(potPercent);
-            potLastValue = potValue;
-        }
-        if (0 < percentBlinkSpeed &&
-            percentVisibleLastChange < millis() - 1000 / percentBlinkSpeed) {
-            percentVisible = !percentVisible;
-            writePercent(potPercent, percentVisible);
-            percentVisibleLastChange = millis();
-        }
-
-        if (0 < wifiBlinkSpeed) {
-            if (wifiIconLastChange < millis() - 1000 / wifiBlinkSpeed) {
-                wifiIconVisible = !wifiIconVisible;
-                drawWifi(wifiIconVisible);
-                wifiIconLastChange = millis();
-            }
-        } else if (wifiConnected != wifiConnectedLastValue) {
-            drawWifi(0 < wifiConnected);
-            wifiConnectedLastValue = wifiConnected;
-        }
-        delay(pot->measurementDelay);
-    }
-
-   private:
-    int potLastValue = 0;
     uint8_t potPercent = 0;
     int wifiConnectedLastValue = 0;
     bool wifiIconVisible = false;
@@ -352,6 +317,40 @@ class OledWithPotAndWifi : public Oled {
         0b00000000, 0b00000110, 0b11100000, 0b00000000,
         0b00000000, 0b00000010, 0b11000000, 0b00000000,
         0b00000000, 0b00000000, 0b10000000, 0b00000000};
+
+    virtual void setup() {
+        Oled::setup();
+        potLastValue = pot->getValue() + 1;  // make sure value gets displayed on oled
+    }
+
+    virtual void loop() {
+        int potValue = pot->getValue();
+        if (potValue != potLastValue) {
+            potPercent = pot->invert                                       //
+                             ? map(potValue, pot->max, pot->min, 1, 100)   //
+                             : map(potValue, pot->min, pot->max, 1, 100);  //
+            writePercent(potPercent);
+            potLastValue = potValue;
+        }
+        if (0 < percentBlinkSpeed &&
+            percentVisibleLastChange < millis() - 1000 / percentBlinkSpeed) {
+            percentVisible = !percentVisible;
+            writePercent(potPercent, percentVisible);
+            percentVisibleLastChange = millis();
+        }
+
+        if (0 < wifiBlinkSpeed) {
+            if (wifiIconLastChange < millis() - 1000 / wifiBlinkSpeed) {
+                wifiIconVisible = !wifiIconVisible;
+                drawWifi(wifiIconVisible);
+                wifiIconLastChange = millis();
+            }
+        } else if (wifiConnected != wifiConnectedLastValue) {
+            drawWifi(0 < wifiConnected);
+            wifiConnectedLastValue = wifiConnected;
+        }
+        delay(pot->measurementDelay);
+    }
 };
 
 void Device::blinkOledWifi(int speed) {
@@ -406,7 +405,7 @@ class Switch : public Device {
         this->pin = pin;
         this->host = host;
         this->hostDevice = hostDevice;
-        this->invert = invert,
+        this->invert = invert;
         pinMode(pin, INPUT_PULLUP);
         lastCommand = read();
     }
@@ -426,6 +425,23 @@ class Switch : public Device {
 
    protected:
     volatile int valueVolatile;
+};
+
+class SwitchBlinker : public Switch {
+   public:
+    SwitchBlinker(
+        const char *name = "Switch",
+        int pin = 0,
+        const char *host = "",
+        const char *hostDevice = "",
+        bool invert = false) : Switch(name, pin, host, hostDevice, invert){};
+
+    int read() {
+        int value = Switch::read();
+        blinkOledPercent(value ? 0 : 300);
+        if (nullptr != oled) oled->potLastValue += 1;  // trigger refresh
+        return value;
+    }
 };
 
 class DeviceCommandTask : public Task, public Request {

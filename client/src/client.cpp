@@ -17,11 +17,10 @@
 
 Config config(NAME, AP_SSID, AP_PASSWORD, MDNS_SERVICE);
 
-Switch enableSwitch("Enable", D5);
-void IRAM_ATTR enableSwitchChanged() {
-    enableSwitch.read();
-    Serial.printf("enableSwitch: %i\n", enableSwitch.getValue());
-}
+Pot speedPot("Speed", A0, CONTROLLER_NAME, "Stepper1");
+
+Adafruit_SSD1306 display(128, 32, &Wire, -1);
+OledWithPotAndWifi oled(&display, &speedPot);
 
 Switch directionSwitch("Direction", D6);
 void IRAM_ATTR directionSwitchChanged() {
@@ -29,12 +28,13 @@ void IRAM_ATTR directionSwitchChanged() {
     Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
 }
 
-Pot speedPot("Speed", A0, CONTROLLER_NAME, "Stepper1");
+SwitchBlinker enableSwitch("Enable", D5);
+void IRAM_ATTR enableSwitchChanged() {
+    enableSwitch.read();
+    Serial.printf("enableSwitch: %i\n", enableSwitch.getValue());
+}
 
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
-
-Adafruit_SSD1306 display(128, 32, &Wire, -1);
-OledWithPotAndWifi oled(&display, &speedPot);
 
 // WiFiManager wifiManager;
 
@@ -86,6 +86,9 @@ void setup() {
     config.addDevice(&speedPot);
 
     commandTask.keepAliveSeconds = 1800;  // 30min, set watchdog timeout higher on server
+
+    enableSwitch.setOled(&oled);
+    enableSwitch.read();  // trigger blinking if disabled
 
     config.setOled(&oled);
 
