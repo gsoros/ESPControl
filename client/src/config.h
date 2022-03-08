@@ -88,8 +88,8 @@ class Config : public Task, public Request {
         // wifiManager.autoConnect(name);
 
         // ... OR connect to an AP
-        Serial.printf("[WiFi] Connecting to %s\n", "xxx");
-        oled->wifiBlinkSpeed = 2;
+        Serial.printf("[WiFi] Connecting to %s\n", apSSID);
+        oled->wifiBlinkSpeed = 5;
         WiFi.mode(WIFI_STA);
         WiFi.begin(apSSID, apPassword);
         while (WiFi.status() != WL_CONNECTED) {
@@ -116,7 +116,7 @@ class Config : public Task, public Request {
         }
         int hostsFound = 0;
         int tries = 0;
-        oled->wifiBlinkSpeed = 4;
+        oled->wifiBlinkSpeed = 10;
         while (hostsFound < hostsNotFound) {
             tries++;
             Serial.printf(

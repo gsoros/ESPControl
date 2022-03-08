@@ -85,7 +85,7 @@ void setup() {
     speedPot.max = 950;
     config.addDevice(&speedPot);
 
-    commandTask.keepAliveSeconds = 1800;  // 30min
+    commandTask.keepAliveSeconds = 1800;  // 30min, set watchdog timeout higher on server
 
     config.setOled(&oled);
 

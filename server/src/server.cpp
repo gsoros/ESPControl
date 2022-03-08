@@ -100,30 +100,33 @@ class ServerTask : public Task {
 class MonitorTask : public Task {
    protected:
     void loop() {
-        // Watchdog: stop stepper [wdTimeout] seconds after the last command received
-        unsigned int t = millis() / 1000;
+        // Watchdog: stop stepper [wdTimeout] milliseconds after the last command received
+        unsigned int t = millis();
         if (0 < stepper1.lastCommandTime &&
             wdTimeout < t &&
             stepper1.lastCommandTime < t - wdTimeout &&
             stepper1.setPoint != 0) {
             Serial.printf("[Watchdog] Remote timed out, stopping the stepper\n");
             stepper1.setPoint = 0;
+            stepper1.lastCommandTime = t;
         }
 
         // Log monitor messages to the serial console
         IPAddress ip = WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP();
         Serial.printf(
-            "[Monitor] IP: %s  enable: %d  direction: %d  speed: %d\n",
+            "[Monitor] IP: %s  WD: %ld EN: %d  DI: %d  SP: %d(%d)\n",
             ip.toString().c_str(),
+            0 == stepper1.setPoint ? 0 : (wdTimeout - (millis() - stepper1.lastCommandTime)) / 1000,
             stepper1.command == 0 ? 0 : 1,
             stepper1.command > 0 ? 1 : 0,
-            abs(stepper1.command));
+            abs(stepper1.command),
+            abs(stepper1.setPoint));
 
         delay(5000);
     }
 
    private:
-    const unsigned int wdTimeout = 3600;  // 1h
+    const unsigned long wdTimeout = 3600000;  // 1h watchdog timeout
 } monitorTask;
 
 void setup() {
