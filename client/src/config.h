@@ -22,6 +22,7 @@ class Config : public Task, public Request {
     const char *mdnsProtocol;
     Device *devices[MAX_DEVICES];
     int deviceCount;
+    OledWithPotAndWifi *oled;
     int discoveryLoopDelay = 3000;
 
     Config(
@@ -76,6 +77,10 @@ class Config : public Task, public Request {
         return NULL;
     }
 
+    void setOled(OledWithPotAndWifi *oled) {
+        this->oled = oled;
+    }
+
    protected:
     void setup() {
         Serial.println("Config::setup");
@@ -84,14 +89,17 @@ class Config : public Task, public Request {
 
         // ... OR connect to an AP
         Serial.printf("[WiFi] Connecting to %s\n", "xxx");
+        oled->wifiBlinkSpeed = 2;
         WiFi.mode(WIFI_STA);
         WiFi.begin(apSSID, apPassword);
         while (WiFi.status() != WL_CONNECTED) {
             delay(300);
             Serial.print(".");
         }
+        oled->wifiBlinkSpeed = 0;
         Serial.print(" connected, IP: ");
         Serial.println(WiFi.localIP());
+        MDNS.begin(this->name);
     }
 
     void loop() {
@@ -106,22 +114,21 @@ class Config : public Task, public Request {
             delay(this->discoveryLoopDelay);
             return;
         }
-        MDNS.begin(this->name);
         int hostsFound = 0;
         int tries = 0;
+        oled->wifiBlinkSpeed = 4;
         while (hostsFound < hostsNotFound) {
             tries++;
             Serial.printf(
-                "Sending mDNS query (try %i, not found %i, found %i)\n",
+                "[Config] Sending mDNS query (try %i, not found %i, found %i)\n",
                 tries,
                 hostsNotFound,
                 hostsFound);
-            Serial.flush();
             int numServices = MDNS.queryService(this->mdnsService, this->mdnsProtocol);
             if (numServices == 0) {
-                Serial.println("no services found");
+                Serial.println("[Config] no services found");
             } else {
-                Serial.printf("%i service%s found\n", numServices, numServices > 1 ? "s" : "");
+                Serial.printf("[Config] %i service%s found\n", numServices, numServices > 1 ? "s" : "");
                 int deviceHostMap[this->deviceCount];
                 for (int s = 0; s < numServices; ++s) {
                     Serial.printf("%i: ", s + 1);
@@ -148,7 +155,7 @@ class Config : public Task, public Request {
                     char response[this->responseBufSize];
                     int http_code = this->requestGet(url, response);
                     if (http_code == HTTP_CODE_OK) {
-                        Serial.print("[Config] code OK\n");
+                        Serial.print("[Config] HTTP code OK\n");
                         StaticJsonDocument<JSON_CONF_SIZE> conf;
                         deserializeJson(conf, response);
                         for (int d = 0; d < this->deviceCount; d++) {
@@ -164,6 +171,7 @@ class Config : public Task, public Request {
             Serial.println();
             if (1 < tries) delay(this->discoveryLoopDelay);
         }
+        oled->wifiBlinkSpeed = 0;
     }
 };
 

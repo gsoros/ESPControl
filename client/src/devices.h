@@ -261,6 +261,7 @@ class OledWithPotAndWifi : public Oled {
    public:
     Pot *pot;
     int wifiConnected = 0;
+    int wifiBlinkSpeed = 0;  // blinks/s
 
     OledWithPotAndWifi(Adafruit_SSD1306 *display, Pot *pot) : Oled(display) {
         this->pot = pot;
@@ -285,7 +286,12 @@ class OledWithPotAndWifi : public Oled {
             potLastValue = potValue;
         }
 
-        if (wifiConnected != wifiConnectedLastValue) {
+        if (0 < wifiBlinkSpeed) {
+            if (wifiIconLastChange < millis() - 1000 / wifiBlinkSpeed) {
+                wifiIconVisible = !wifiIconVisible;
+                drawWifi(wifiIconVisible);
+            }
+        } else if (wifiConnected != wifiConnectedLastValue) {
             drawWifi(0 < wifiConnected);
             wifiConnectedLastValue = wifiConnected;
         }
@@ -295,6 +301,8 @@ class OledWithPotAndWifi : public Oled {
    private:
     int potLastValue = 0;
     int wifiConnectedLastValue = 0;
+    bool wifiIconVisible = false;
+    unsigned long wifiIconLastChange = 0;
     const uint8_t wifiIconWidth = 32;
     const uint8_t wifiIconHeight = 32;
     const unsigned char wifiIcon[32 * 32] = {

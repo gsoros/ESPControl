@@ -9,18 +9,17 @@
 #include "ui.html.h"
 #include "config.h"
 
-#define NAME "Controller1"
+#define NAME "ESPController001"
+#define AP_SSID NAME
 #define AP_PASSWORD "Yoh9Ge2goucoo2la"
 #define MDNS_SERVICE "ESPControl"
+
 #define API_PORT 50123  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
-//#define API_PORT 80
 #define JSON_LENGTH 512
 #define HTML_LENGTH 8192
 
 Config config;
 Stepper stepper1;
-// Stepper stepper2;
-// Led led1;
 
 WiFiManager wifiManager;
 ESP8266WebServer server(API_PORT);
@@ -101,11 +100,10 @@ class MonitorTask : public Task {
    protected:
     void loop() {
         // Watchdog: stop stepper 15 seconds after the last command received
-        unsigned long timeout = 15000;
         unsigned long t = millis();
         if (0 < stepper1.lastCommandTime &&
-            timeout < t &&
-            stepper1.lastCommandTime < t - timeout &&
+            wdTimeout < t &&
+            stepper1.lastCommandTime < t - wdTimeout &&
             stepper1.setPoint != 0) {
             Serial.printf("[Watchdog] Remote timed out, stopping the stepper\n");
             stepper1.setPoint = 0;
@@ -119,8 +117,12 @@ class MonitorTask : public Task {
             stepper1.command == 0 ? 0 : 1,
             stepper1.command > 0 ? 1 : 0,
             abs(stepper1.command));
+
         delay(5000);
     }
+
+   private:
+    const unsigned long wdTimeout = 15000;
 } monitorTask;
 
 void setup() {
@@ -159,7 +161,7 @@ void setup() {
     // ... OR create an AP ...
     Serial.print("[WiFi AP] Setting up acces point");
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(config.name, AP_PASSWORD);
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
     Serial.print(" done, IP: ");
     Serial.println(WiFi.softAPIP().toString().c_str());
 

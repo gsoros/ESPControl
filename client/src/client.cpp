@@ -9,9 +9,13 @@
 #include "config.h"
 #include "devices.h"
 
+#define NAME "ESPRemote001"
+#define CONTROLLER_NAME "ESPController001"
+#define AP_SSID CONTROLLER_NAME
 #define AP_PASSWORD "Yoh9Ge2goucoo2la"
+#define MDNS_SERVICE "ESPControl"
 
-Config config("Remote1", "Controller1", AP_PASSWORD, "ESPControl");
+Config config(NAME, AP_SSID, AP_PASSWORD, MDNS_SERVICE);
 
 Switch enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
@@ -25,7 +29,7 @@ void IRAM_ATTR directionSwitchChanged() {
     Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
 }
 
-Pot speedPot("Speed", A0, "Controller1", "Stepper1");
+Pot speedPot("Speed", A0, CONTROLLER_NAME, "Stepper1");
 
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
 
@@ -78,6 +82,8 @@ void setup() {
     speedPot.min = 9;
     speedPot.max = 950;
     config.addDevice(&speedPot);
+
+    config.setOled(&oled);
 
     Scheduler.start(&oled);
     Scheduler.start(&config);
