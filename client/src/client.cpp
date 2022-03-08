@@ -25,13 +25,13 @@ OledWithPotAndWifi oled(&display, &speedPot);
 Switch directionSwitch("Direction", D6);
 void IRAM_ATTR directionSwitchChanged() {
     directionSwitch.read();
-    Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
+    // Serial.printf("directionSwitch: %i\n", directionSwitch.getValue());
 }
 
 SwitchBlinker enableSwitch("Enable", D5);
 void IRAM_ATTR enableSwitchChanged() {
     enableSwitch.read();
-    Serial.printf("enableSwitch: %i\n", enableSwitch.getValue());
+    // Serial.printf("enableSwitch: %i\n", enableSwitch.getValue());
 }
 
 PotWithDirectionAndEnableCommandTask commandTask(&speedPot, &enableSwitch, &directionSwitch);
@@ -89,7 +89,7 @@ void setup() {
     commandTask.keepAliveSeconds = 1800;  // 30min, set watchdog timeout higher on server
 
     enableSwitch.setOled(&oled);
-    enableSwitch.read();  // trigger blinking if disabled
+    enableSwitch.read();  // trigger blinking if disabled at boot
 
     config.setOled(&oled);
 

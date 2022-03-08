@@ -24,15 +24,25 @@ AsyncWebServer server(API_PORT);
 char configJson[JSON_LENGTH];
 char uiHtml[HTML_LENGTH];
 
+String htmlProcessor(const String& var) {
+    if (var == "FQDN_OR_IP")
+        return WIFI_STA == WiFi.getMode()       //
+                   ? WiFi.localIP().toString()  //
+                   : WiFi.softAPIP().toString();
+    if (var == "PORT")
+        return String(API_PORT);
+    return String();
+}
+
 void handleWebUI(AsyncWebServerRequest* request) {
     Serial.println("[HTTP] handleWebUI()");
-    request->send(200, "text/html", uiHtml);
-    Serial.println("[HTTP] WebUI");
+    AsyncWebServerResponse* response = request->beginResponse_P(200, "text/html", indexHtmlTemplate, htmlProcessor);
+    response->addHeader("Access-Control-Allow-Origin", "*");
+    request->send(response);
 }
 
 void handleApiControl(AsyncWebServerRequest* request) {
     // Serial.println("[HTTP] handleApiControl()");
-    Serial.flush();
     config.handleApiControl(request);
 }
 
@@ -174,16 +184,6 @@ void setup() {
     // }
     // Serial.print(" connected, IP: ");
     // Serial.println(WiFi.localIP());
-
-    Serial.printf("[Setup] Processing index.html template: %i\n",
-                  snprintf_P(
-                      uiHtml,
-                      HTML_LENGTH,
-                      indexHtmlTemplate,
-                      WIFI_STA == WiFi.getMode()               //
-                          ? WiFi.localIP().toString().c_str()  //
-                          : WiFi.softAPIP().toString().c_str(),
-                      API_PORT));
 
     Scheduler.start(&serverTask);
     config.startControlTasks();

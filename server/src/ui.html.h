@@ -12,7 +12,7 @@ const char indexHtmlTemplate[] PROGMEM = R"====(
     <div id="devices" style="text-align: left">
     </div>
     <script>
-        var urlBase = "http://%s:%i/";
+        var urlBase = "http://%FQDN_OR_IP%:%PORT%/";
         var rate = 1000;
         var commands = [];
         var lastCommands = [];
