@@ -1,19 +1,14 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <Scheduler.h>    // https://github.com/nrwiersma/ESP8266Scheduler
-#include <WiFiManager.h>  // https://github.com/tzapu/WiFiManager
+#include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>  // https://github.com/bblanchon/ArduinoJson
+
 #include "config.h"
 #include "devices.h"
-
-#define NAME "ESPRemote001"
-#define CONTROLLER_NAME "ESPController001"
-#define AP_SSID CONTROLLER_NAME
-#define AP_PASSWORD "Yoh9Ge2goucoo2la"
-#define MDNS_SERVICE "ESPControl"
+#include "credentials.h"
 
 Config config(NAME, AP_SSID, AP_PASSWORD, MDNS_SERVICE);
 

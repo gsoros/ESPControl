@@ -5,13 +5,10 @@
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
 #include <ESP8266mDNS.h>
 #include <Arduino_JSON.h>
+
 #include "ui.html.h"
 #include "config.h"
-
-#define NAME "ESPController001"
-#define AP_SSID NAME
-#define AP_PASSWORD "Yoh9Ge2goucoo2la"
-#define MDNS_SERVICE "ESPControl"
+#include "credentials.h"
 
 #define API_PORT 50123  // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
 #define JSON_LENGTH 512
