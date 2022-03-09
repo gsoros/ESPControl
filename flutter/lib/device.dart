@@ -9,8 +9,7 @@ abstract class Device {
 
   Device(this.name, this.type, this.sendCommand, this.setState);
 
-  factory Device.fromJson(
-      Map<String, dynamic> json, Function sendCommand, Function setState) {
+  factory Device.fromJson(Map<String, dynamic> json, Function sendCommand, Function setState) {
     var name = json['name'];
     if (null == name) throw Exception('Missing device name');
     var type = json['type'];
@@ -35,13 +34,12 @@ class Stepper extends Device {
   int command = 0;
   bool enabled = false;
 
-  Stepper(String name, Function sendCommand, Function setState)
-      : super(name, 'stepper', sendCommand, setState);
+  Stepper(String name, Function sendCommand, Function setState) : super(name, 'stepper', sendCommand, setState);
 
   void configFromJson(Map<String, dynamic> json) {
-    //debugPrint("configFromJson $name $json");
-    if (json.containsKey('command_min')) min = json['command_min'].toInt();
-    if (json.containsKey('command_max')) max = json['command_max'].toInt();
+    debugPrint("configFromJson $name $json");
+    if (json.containsKey('commandMin')) min = json['commandMin'].toInt();
+    if (json.containsKey('commandMax')) max = json['commandMax'].toInt();
     command = (min + max) ~/ 2;
   }
 
@@ -50,7 +48,6 @@ class Stepper extends Device {
       Container(
         transform: Matrix4.rotationZ(0.05),
         child: Slider(
-          key: null,
           onChanged: (value) {
             setState(() {
               command = value.toInt();
@@ -103,8 +100,7 @@ class Stepper extends Device {
 class Led extends Device {
   bool enabled = false;
 
-  Led(String name, Function sendCommand, Function setState)
-      : super(name, 'led', sendCommand, setState);
+  Led(String name, Function sendCommand, Function setState) : super(name, 'led', sendCommand, setState);
 
   List<Widget> toWidgetList() {
     return <Widget>[

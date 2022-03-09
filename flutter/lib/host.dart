@@ -1,7 +1,9 @@
+import 'dart:convert';
+
 import 'package:multicast_dns/multicast_dns.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:flutter/material.dart';
+
 import 'device.dart';
 
 class Host {
@@ -84,8 +86,7 @@ class Host {
       debugPrint("[HTTP] Request to $path OK, response: $responseBody");
       return responseBody;
     } else {
-      var msg =
-          "[HTTP] Request to $path failed: ${statusCode.toString()} $responseBody";
+      var msg = "[HTTP] Request to $path failed: ${statusCode.toString()} $responseBody";
       debugPrint(msg);
       log(msg);
     }
@@ -99,16 +100,13 @@ class Host {
           debugPrint("Config reply from $name: $json");
           Map<String, dynamic> config = jsonDecode(json);
 
-          if (null != config['rate'] && rate != config['rate'])
-            rate = config['rate'];
+          if (null != config['rate'] && rate != config['rate']) rate = config['rate'];
           if (null != config['devices']) {
             config['devices'].forEach((jsonDevice) {
-              if (jsonDevice.containsKey('name') &&
-                  !hasDevice(jsonDevice['name'])) {
+              if (jsonDevice.containsKey('name') && !hasDevice(jsonDevice['name'])) {
                 debugPrint("[Config] Host: $name  Device: $jsonDevice");
                 setState(() {
-                  updateDevice(
-                      Device.fromJson(jsonDevice, sendCommand, setState));
+                  updateDevice(Device.fromJson(jsonDevice, sendCommand, setState));
                 });
               }
             });
@@ -172,8 +170,7 @@ class Host {
         ),
       );
     });
-    if (widgets.length < 1)
-      widgets.add(Text("This host has no devices configured"));
+    if (widgets.length < 1) widgets.add(Text("This host has no devices configured"));
     //debugPrint("$name.toWidgetList(): $widgets");
     widgets.add(SizedBox(height: 50));
     return widgets;
@@ -269,12 +266,8 @@ class Hosts {
       debugPrint("changed: new ${newHost.name}");
       return true;
     }
-    if (host.name != newHost.name ||
-        host.ip != newHost.ip ||
-        host.port != newHost.port) {
-      debugPrint("changed: params changed\n" +
-          "${host.name}:${host.ip}:${host.port}\n" +
-          "${newHost.name}:${newHost.ip}:${newHost.port}");
+    if (host.name != newHost.name || host.ip != newHost.ip || host.port != newHost.port) {
+      debugPrint("changed: params changed\n" + "${host.name}:${host.ip}:${host.port}\n" + "${newHost.name}:${newHost.ip}:${newHost.port}");
       return true;
     }
     return false;
@@ -314,29 +307,22 @@ class Hosts {
     //debugPrint('[mDNS] Strarting discovery');
     await client.start();
 
-    await for (final PtrResourceRecord ptr in client.lookup<PtrResourceRecord>(
-        ResourceRecordQuery.serverPointer(
-            '_' + _mDNSServiceType + '._' + _mDNSProtocol))) {
+    await for (final PtrResourceRecord ptr
+        in client.lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer('_' + _mDNSServiceType + '._' + _mDNSProtocol))) {
       //debugPrint('[mDNS] PTR: ${ptr.toString()}');
 
-      await for (final SrvResourceRecord srv
-          in client.lookup<SrvResourceRecord>(
-              ResourceRecordQuery.service(ptr.domainName))) {
+      await for (final SrvResourceRecord srv in client.lookup<SrvResourceRecord>(ResourceRecordQuery.service(ptr.domainName))) {
         //debugPrint('[mDNS] SRV target: ${srv.target} port: ${srv.port}');
 
-        await for (final IPAddressResourceRecord ip
-            in client.lookup<IPAddressResourceRecord>(
-                ResourceRecordQuery.addressIPv4(srv.target))) {
+        await for (final IPAddressResourceRecord ip in client.lookup<IPAddressResourceRecord>(ResourceRecordQuery.addressIPv4(srv.target))) {
           //debugPrint('[mDNS] IP: ${ip.address.toString()}');
-          String name =
-              ptr.domainName.substring(0, ptr.domainName.indexOf('.'));
+          String name = ptr.domainName.substring(0, ptr.domainName.indexOf('.'));
           //debugPrint('[mDNS] Name: $name');
 
           if (name.length > 0) {
             //debugPrint("Checking $name");
             if (!discovered.contains(name)) discovered.add(name);
-            var host = Host(name, ip.address.address.toString(), srv.port,
-                httpClient, setState, log);
+            var host = Host(name, ip.address.address.toString(), srv.port, httpClient, setState, log);
             if (changed(host)) {
               if (!has(name))
                 log("Host $name discovered");

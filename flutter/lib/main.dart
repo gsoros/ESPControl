@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'dart:ui';
 //import 'dart:io';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 //import 'package:flutter_switch/flutter_switch.dart';
 //import 'package:multicast_dns/multicast_dns.dart';
+
 //import 'random.dart' as random;
 import 'host.dart';
 //import 'device.dart';
@@ -95,8 +96,7 @@ class _StepperHomeState extends State<StepperHome> {
                   Container(
                     padding: EdgeInsets.fromLTRB(20, 40, 20, 10),
                     transform: Matrix4.rotationZ(-0.14),
-                    child: 
-                      _hosts.count() > 0
+                    child: _hosts.count() > 0
                         ? DropdownButton<String>(
                             value: _hosts.currentName(),
                             items: _hosts.toDropdownMenuItems(),
