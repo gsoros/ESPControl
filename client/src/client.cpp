@@ -76,7 +76,7 @@ void setup() {
     speedPot.invert = true;
     speedPot.min = 9;
     speedPot.max = 950;
-    speedPot.movementMin = 5;
+    speedPot.movementMin = 5;  // remove jitter
     config.addDevice(&speedPot);
 
     commandTask.keepAliveSeconds = 1800;  // 30min, set watchdog timeout higher on server
