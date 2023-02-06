@@ -3,7 +3,10 @@
 
 #include <Arduino_JSON.h>
 #include <ESPAsyncWebServer.h>
+
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
+#include <Task.h>
+#include <LeanTask.h>
 
 #define JSON_MODE_PRIVATE 0
 #define JSON_MODE_PUBLIC 1

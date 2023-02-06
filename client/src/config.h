@@ -2,7 +2,11 @@
 #define CONFIG_H
 
 #include <ESP8266HTTPClient.h>
+
 #include <Scheduler.h>  // https://github.com/nrwiersma/ESP8266Scheduler
+#include <Task.h>
+#include <LeanTask.h>
+
 #include <ESP8266mDNS.h>
 #include <ArduinoJson.h>  // https://github.com/bblanchon/ArduinoJson
 #include "devices.h"
