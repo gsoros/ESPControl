@@ -145,10 +145,10 @@ void setup() {
     stepper1.pinEnable = D1;
     stepper1.pinDirection = D2;
     stepper1.pinPulse = D3;
-    stepper1.pulseMin = 1500;   // minimum pause between pulses in microsecs (fastest speed)
+    stepper1.pulseMin = 200;    // minimum pause between pulses in microsecs (fastest speed)
     stepper1.pulseMax = 15000;  // maximum pause between pulses in microsecs (slowest speed)
     stepper1.pulseWidth = 1;    // pulse width in microsecs
-    stepper1.changeMax = 1;     // maximum step of speed change per cycle
+    stepper1.changeMax = 100;   // maximum step of speed change per cycle
     stepper1.commandMin = -1024;
     stepper1.commandMax = 1024;
 

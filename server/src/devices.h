@@ -168,19 +168,24 @@ class Stepper : public Device {
         if (command < 0) {
             min = commandMax < 0 ? abs(commandMax) : 0;
             max = abs(commandMin);
-        } else {  // 0 < command
+        } else {  // 0 <= command
             min = 0 < commandMin ? commandMin : 0;
             max = commandMax;
         }
+
+        double factor = max / 10;
+        long commandLog2 = log2(abs(command)) * factor;
+        // Serial.printf("[Stepper %s] calculatePause commandLog2: %ld\n", name, commandLog2);
+
         unsigned long pause = map(
-            abs(command),
+            commandLog2,
             min,
             max,
             pulseMax,
             pulseMin);
-        // Serial.printf(
-        //    "[Stepper %s] calculatePause command: %d (%d ... %d) => pause: %ld (%ld ... %ld)\n",
-        //    name, command, min, max, pause, pulseMin, pulseMax);
+        Serial.printf(
+            "[Stepper %s] calculatePause command: %d (%d ... %d) => pause: %ld (%ld ... %ld)\n",
+            name, command, min, max, pause, pulseMin, pulseMax);
         return pause;
     }
 
